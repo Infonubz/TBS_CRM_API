@@ -7,12 +7,12 @@ const getAllOperatorDetails = async (req, res) => {
             SELECT o.*, od.*
             FROM operators_tbl AS o
             LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id
-            WHERE o.user_status_id IN (0,1,2)
+            WHERE o.user_status_id IN (0,1,2) ORDER BY created_date DESC
         `;
         const result = await pool.query(query);
 
         if (result.rowCount === 0) {
-            return res.status(200).json({ message: 'No operators with draft or active status found' ,
+            return res.status(200).json({ message: 'No operators with draft or active and inactive status found' ,
                 data: result.rows
             });
         }
@@ -33,7 +33,7 @@ const getOperatorByID = async (req, res) => {
             SELECT o.*, od.*
             FROM operators_tbl AS o
             LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id
-            WHERE o.tbs_operator_id = $1 AND o.user_status_id IN (0,1,2)
+            WHERE o.tbs_operator_id = $1 AND o.user_status_id IN (0,1,2) ORDER BY created_date DESC
         `;
 
         const result = await pool.query(query, [operatorid]);
@@ -91,6 +91,7 @@ const putUser_Status = async (req, res) => {
     }
 }
 
+//user management-PARTNERS GETbyID CONTROLLER
 const getAllPartnerDetails = async (req, res) => {
     try {
         const query = `

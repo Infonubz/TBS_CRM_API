@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer');
 const path = require('path');
-const { postOperator, putOperatorPersonal, Emailvalidation, phoneValidation, deleteOperator, searchOperator, getOperator, Operator_business_details, Operator_detailsByID, getOperator_addressByID, getOperator_address, operator_details, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, excelImport, getOperatorProfileImg, getOperatorProfileImgByid } = require('../Controller/operator_controller');
+const { postOperator, putOperatorPersonal, Emailvalidation, phoneValidation, deleteOperator, searchOperator, getOperator, Operator_business_details, Operator_detailsByID, getOperator_addressByID, getOperator_address, operator_details, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, getImg, getImgByID, ImportExcel, getEmail, getEmailByID } = require('../Controller/operator_controller');
 
 const oprouter = express.Router()
 
@@ -52,13 +52,15 @@ oprouter.post('/operator_validation', phoneValidation)
 oprouter.delete('/operators/:tbs_operator_id', deleteOperator)
 oprouter.get('/operators-search/:search_term', searchOperator)
 oprouter.get('/operators', getOperator)
+oprouter.get('/operators-profileImg', getImg)
+oprouter.get('/operators-profileImg/:tbs_operator_id', getImgByID)
+oprouter.get('/operators-emailid', getEmail)
+oprouter.get('/operators-emailid/:tbs_operator_id', getEmailByID)
 oprouter.get('/operators/:tbs_operator_id', getOperatorByID)
-oprouter.get('/get-business/:tbs_operator_id', Operator_business_details)
-oprouter.get('/getall-business', Operator_detailsByID)
+oprouter.get('/get-business/:tbs_operator_id', Operator_detailsByID)
+oprouter.get('/getall-business', Operator_business_details)
 oprouter.post('/operator-login', operatorLogin)
 oprouter.put('/operator-profileImg/:tbs_operator_id', operator_upload.single('profileimg'), putOperatorProfileImg);
-oprouter.get('/operator-profileImg/:tbs_operator_id', getOperatorProfileImgByid)
-oprouter.get('/operator-profileImg', getOperatorProfileImg)
 
 oprouter.get('/getall-address/:tbs_operator_id', getOperator_addressByID)
 oprouter.get('/getall-address', getOperator_address)
@@ -70,11 +72,20 @@ oprouter.post('/operator_details/:tbs_operator_id', operator_upload.fields([
     { name: 'pancard_front_doc', maxCount: 1 },
     { name: 'pancard_back_doc', maxCount: 1 },
     { name: 'msme_doc', maxCount: 1 }]), operator_details)
+    
+oprouter.put('/operator_details/:tbs_operator_id', operator_upload.fields([
+        { name: 'upload_gst', maxCount: 1 },
+        { name: 'aadar_front_doc', maxCount: 1 },
+        { name: 'aadar_back_doc', maxCount: 1 },
+        { name: 'pancard_front_doc', maxCount: 1 },
+        { name: 'pancard_back_doc', maxCount: 1 },
+        { name: 'msme_doc', maxCount: 1 }]), operator_details)
+
 
 oprouter.get('/getall-GST', getGST)
 oprouter.get('/get-GST/:tbs_operator_id', getGSTByID)
 oprouter.get('/getall-Docs', getDoc)
 oprouter.get('/get-Docs/:tbs_operator_id', getDocByID)
-oprouter.post('/upload', operator_upload.single('xlsxFile'),excelImport);
+oprouter.post('/excelupload', operator_upload.single('xlsxFile'), ImportExcel)
 
 module.exports = { oprouter }

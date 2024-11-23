@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const pool = require('../dbconnection');
+const pool = require('../config/db');
 
 // Nodemailer configuration
 const transporter = nodemailer.createTransport({

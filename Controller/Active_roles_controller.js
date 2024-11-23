@@ -1,11 +1,11 @@
 
 const express = require('express');
-const pool = require('../dbconnection.js');
+const pool = require('../config/db');
 
 //GET ALL ROLES
 const getRole = async (req, res) => {
     try{
-        const result = await pool.query('SELECT * FROM active_roles_tbl');
+        const result = await pool.query('SELECT * FROM active_roles_tbl ORDER BY created_date DESC ');
         res.status(200).send(result.rows);
     } catch(err) {
         console.log(err.message);

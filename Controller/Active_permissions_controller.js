@@ -1,10 +1,10 @@
 const express = require('express');
-const pool = require('../dbconnection.js');
+const pool = require('../config/db');
 
 //GET ALL PERMISSIONS
 const getPermission = async (req, res) => {
     try{
-        const result = await pool.query('SELECT * FROM active_permissions_tbl');
+        const result = await pool.query('SELECT * FROM active_permissions_tbl ORDER BY updated_date DESC');
         res.status(200).send(result.rows);
     } catch(err) {
         console.log(err.message);
@@ -188,5 +188,7 @@ const searchPermissions = async (req, res) => {
         res.status(201).json({ error: 'Error searching records' });
     }
 };
+
+
 
 module.exports = {getPermission, getPermissionbyId, putPermission, deletePermission, roleValidation, searchPermissions, fetchUserRoles, getCrudPermissionCounts};

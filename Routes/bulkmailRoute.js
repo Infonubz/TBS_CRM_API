@@ -1,8 +1,11 @@
 const express = require('express')
-const { BulkMail } = require('../Controller/bulkmailController')
+const { BulkMail, getFromEmail } = require('../Controller/bulkmailController')
 
 const mailrouter = express.Router()
 
+
 mailrouter.post('/sendBulkMail', BulkMail)
+
+mailrouter.get('/getFromEmail', getFromEmail)
 
 module.exports = { mailrouter }

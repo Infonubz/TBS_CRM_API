@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx')
 const path = require('path');
-const { getPromo, getPromobyId, postPromo, deletePromo, searchPromo, putPromo, sheetUpload, getPromobyStatus, putPromoStatus, searchPromoReq, getOperatorRecords, promoFilterByDate } = require('../Controller/Promotion_controller');
+const { getPromo, getPromobyId, postPromo, deletePromo, searchPromo, putPromo, sheetUpload, getPromobyStatus, putPromoStatus, searchPromoReq, getOperatorRecords, promoFilterByDate, getRecentPromos } = require('../Controller/Promotion_controller');
 
 const promotionsRouter = express.Router();
 
@@ -49,8 +49,9 @@ promotionsRouter.post('/promo/importxlsx', promo_upload.single('xlsxFile'), shee
 promotionsRouter.get('/promo-status/:promo_status_id', getPromobyStatus);
 promotionsRouter.put('/promo-statusId/:promo_id', putPromoStatus);
 promotionsRouter.get('/promo/search/:searchTerm', searchPromo);
-promotionsRouter.get('/promo/searchReq/:searchTerm', searchPromoReq);
+promotionsRouter.post('/promo/searchReq', searchPromoReq);
 promotionsRouter.get('/promo-operatorDetails', getOperatorRecords);
 promotionsRouter.post('/promo/filter', promoFilterByDate);
+promotionsRouter.get('/recentPromos', getRecentPromos);
 
 module.exports = { promotionsRouter };

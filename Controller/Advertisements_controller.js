@@ -1,14 +1,33 @@
-const pool = require('../dbconnection.js');
+const pool = require('../config/db');
 
 //GET ALL ADVERTISEMENTS
 const getAd = async (req, res) => {
-    pool.query(`SELECT * FROM advertisements_tbl`, (err,result) => {
-        if(!err){
-            res.send(result.rows);
-        } 
+    pool.query(`SELECT * FROM advertisements_tbl ORDER BY created_date DESC`, (err, result) => {
+        if (!err) {
+            const ads = result.rows.map(ad => {
+                const adVideoDetails = {
+                    path: ad.ad_video,
+                    size: ad.ad_file_size,
+                    type: ad.ad_file_type,
+                    duration: ad.duration,
+                    hours: ad.hours,
+                    fieldname: "ad_video",
+                };
+
+                return {
+                    ...ad,
+                    ad_video_details: adVideoDetails,
+                };
+            });
+
+            res.send(ads);
+        } else {
+            console.error(err.message);
+            res.status(500).send("Error fetching advertisements");
+        }
         pool.end;
-    })
-};
+    });
+}
 
 const getCombinedData = async (req, res) => {
     try {
@@ -27,40 +46,94 @@ const getCombinedData = async (req, res) => {
         `;
 
         const result = await pool.query(query);
-        res.status(200).send(result.rows);
+
+        const combinedData = result.rows.map(ad => {
+            const adVideoDetails = {
+                path: ad.ad_video,
+                size: ad.ad_file_size,
+                type: ad.ad_file_type,
+                duration: ad.duration,
+                hours: ad.hours,
+                fieldname: "ad_video",
+            };
+
+            return {
+                ...ad,
+                ad_video_details: adVideoDetails,
+            };
+        });
+
+        res.status(200).send(combinedData);
     } catch (err) {
         console.log(err.message);
         res.status(500).send("Error getting records");
     }
-};
+}
 
-
-//GET ADVERTISEMENT BY ID
+// GET ADVERTISEMENT BY ID
 const getAdbyId = async (req, res) => {
-    try{
+    try {
         const id = req.params.tbs_ad_id;
         const getAdId = `SELECT * FROM advertisements_tbl WHERE tbs_ad_id = $1`;
-        const result = await pool.query(getAdId,[id]);
-        res.status(200).send(result.rows);
-    } catch(err) {
+        const result = await pool.query(getAdId, [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).send("Advertisement not found");
+        }
+
+        const adDetails = result.rows[0];
+
+        const adVideoDetails = {
+            path: adDetails.ad_video, 
+            size: adDetails.ad_file_size, 
+            type: adDetails.ad_file_type,
+            duration: adDetails.duration, 
+            hours: adDetails.hours,
+            fieldname: "ad_video",
+        };
+
+        // Including adVideoDetails in the response
+        const response = {
+            ...adDetails,
+            ad_video_details: adVideoDetails,
+        };
+
+        res.status(200).json(response);
+    } catch (err) {
         console.log(err.message);
-        res.status(201).send("Error getting records");
+        res.status(500).send("Error getting records");
     }
-};
+}
 
 //GET ADVERTISEMENT BY STATUS
 const getAdbyStatus = async (req, res) => {
-    try{
+    try {
         const id = req.params.status_id;
         const getAdStatus = `SELECT * FROM advertisements_tbl WHERE status_id = $1`;
-        const result = await pool.query(getAdStatus,[id]);
-        res.status(200).send(result.rows);
-    } catch(err) {
-        console.log(err.message);
-        res.status(201).send("Error getting records");
-    }
-};
+        const result = await pool.query(getAdStatus, [id]);
 
+        const ads = result.rows.map(ad => {
+            const adVideoDetails = {
+                path: ad.ad_video,
+                size: ad.ad_file_size,
+                type: ad.ad_file_type,
+                duration: ad.duration,
+                hours: ad.hours,
+                fieldname: "ad_video",
+            };
+
+            return {
+                ...ad,
+                ad_video_details: adVideoDetails,
+            };
+        });
+
+        res.status(200).send(ads);
+    } catch (err) {
+        console.log(err.message);
+        res.status(500).send("Error getting records");
+    }
+}
 
 //GET CLIENT RECORDS FOR DROPDOWN
 const getClientRecords = async (req, res) => {
@@ -88,152 +161,269 @@ const getClientDetails = async (req, res) => {
 
 
 //DELETE ADVERTISEMENT BY ID
-const deleteAd = async (req,res) => {
-    
-    try{
-    const id = req.params.tbs_ad_id;
-    const removeAd = 'DELETE FROM advertisements_tbl WHERE tbs_ad_id = $1';
-    const result = await pool.query(removeAd, [id]);
-    res.status(200).send('Deleted successfully!');
-    } catch(err) {
-        console.log(err);
-        res.status(201).send('Error deleting advertisement');
+const deleteAd = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const adId = req.params.tbs_ad_id;
+
+        // Start a transaction
+        await client.query('BEGIN');
+
+        // Check if the advertisement exists
+        const adQuery = 'SELECT * FROM advertisements_tbl WHERE tbs_ad_id = $1';
+        const adResult = await client.query(adQuery, [adId]);
+
+        if (adResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message :`Advertisement with ID : ${adId} not found`});
+        }
+
+        const ad = adResult.rows[0];
+
+        // Prepare data for the recycle bin
+        const deletedData = {
+            client_details: ad.client_details,
+            ad_title: ad.ad_title,
+            start_date: ad.start_date,
+            end_date: ad.end_date,
+            ad_description: ad.ad_description,
+            usage_per_day: ad.usage_per_day,
+            status: ad.status,
+            ad_video: ad.ad_video,
+            ad_file_size: ad.ad_file_size,
+            ad_file_type: ad.ad_file_type,
+            created_date: ad.created_date,
+            status_id: ad.status_id,
+            tbs_client_id: ad.tbs_client_id,
+            page_id: ad.page_id,
+            page_name: ad.page_name,
+            tbs_user_id: ad.tbs_user_id,
+            hours: ad.hours,
+            duration: ad.duration,
+            ads_plan_id: ad.ads_plan_id,
+            req_status: ad.req_status,
+            req_status_id: ad.req_status_id,
+            updated_date: ad.updated_date
+        };
+
+        // Insert deleted data into the recycle bin
+        const recycleInsertQuery = 'INSERT INTO recycle_bin (module_name, module_id, deleted_data, module_get_id) VALUES ($1, $2, $3, $4) RETURNING tbs_recycle_id';
+        await client.query(recycleInsertQuery, ['advertisements', adId, deletedData, 3]);
+
+        // Remove the advertisement
+        const removeAd = 'DELETE FROM advertisements_tbl WHERE tbs_ad_id = $1';
+        await client.query(removeAd, [adId]);
+
+        // Remove the ad ID from the respective user's table
+        const tbs_user_id = ad.tbs_user_id;
+        if (tbs_user_id.startsWith('tbs-pro_emp')) {
+            await client.query(
+                `UPDATE pro_emp_personal_details 
+                 SET advertisements = array_remove(advertisements, $1) 
+                 WHERE tbs_pro_emp_id = $2`,
+                [adId, tbs_user_id]
+            );
+        } else if (tbs_user_id.startsWith('tbs-pro')) {
+            await client.query(
+                `UPDATE product_owner_tbl 
+                 SET advertisements = array_remove(advertisements, $1) 
+                 WHERE owner_id = $2`,
+                [adId, tbs_user_id]
+            );
+        }
+
+        // Commit the transaction
+        await client.query('COMMIT');
+
+        res.status(200).json({ message : 'Advertisement deleted successfully and stored in recycle bin.'});
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error deleting advertisement:', error);
+        res.status(500).send('Error deleting advertisement');
+    } finally {
+        client.release();
     }
 };
 
 
+
 //POST ADVERTISEMENT
+
 const postAd = async (req, res) => {
-    const { client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, ad_video, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id } = req.body;
-    console.log('Request Body:', req.body);
+    const {
+        ad_title, start_date, end_date, ad_description, usage_per_day, status, 
+        ad_video, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, 
+        duration, ads_plan_id, req_status, req_status_id
+    } = req.body;
+
+    if (!tbs_user_id) {
+        return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    if (req.file && req.file.size > 15 * 1024 * 1024) {
+        return res.status(400).send('File size exceeded (Max: 15MB)');
+    }
+
+    if (req.file && !['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'image/gif'].includes(req.file.mimetype)) {
+        return res.status(400).send('Only .jpeg, .jpg, .png, .mp4, and .gif files are allowed');
+    }
+
+    const uploadAdUrl = req.file ? `/advertisement_files/${req.file.filename}` : null;
+    const ad_file_size = req.file ? req.file.size : null;
+    const ad_file_type = req.file ? req.file.mimetype : null;
+
+    let employeeName = '';
+    let tbs_ad_id;
+
+    try {
+        // Fetch company_name from client_company_details based on tbs_client_id
+        const clientResult = await pool.query(
+            `SELECT company_name FROM client_company_details WHERE tbs_client_id = $1`,
+            [tbs_client_id]
+        );
+
+        if (clientResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Client not found' });
+        }
+
+        const client_details = clientResult.rows[0].company_name;
+
+        // Log the client_details value to confirm it's being fetched
+        console.log('Fetched client_details:', client_details);
+
+        // Check if the user is an employee or a product owner
+        if (tbs_user_id.startsWith('tbs-pro_emp')) {
+            const employeeResult = await pool.query(
+                `SELECT emp_status, emp_status_id, emp_first_name FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`,
+                [tbs_user_id]
+            );
+
+            if (employeeResult.rows.length === 0) {
+                return res.status(404).json({ message: 'Employee not found' });
+            }
+
+            const employee = employeeResult.rows[0];
+            const isActive = employee.emp_status_id === 1 && employee.emp_status.toLowerCase() === 'active';
+            employeeName = employee.emp_first_name || 'Unknown';
+
+            if (!isActive) {
+                return res.status(400).json({ message: 'Employee status is not active' });
+            }
+        } else if (tbs_user_id.startsWith('tbs-pro')) {
+            const ownerResult = await pool.query(
+                `SELECT owner_name FROM product_owner_tbl WHERE owner_id = $1`,
+                [tbs_user_id]
+            );
+
+            if (ownerResult.rows.length === 0) {
+                return res.status(404).json({ message: 'Product owner not found' });
+            }
+
+            const owner = ownerResult.rows[0];
+            employeeName = owner.owner_name || 'Unknown';
+        } else {
+            return res.status(400).json({ message: 'Invalid user ID type' });
+        }
+
+        // Insert advertisement into advertisements_tbl and get the generated ID
+        const insertAds = `
+            INSERT INTO advertisements_tbl (
+                client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, 
+                ad_video, ad_file_size, ad_file_type, status_id, tbs_client_id, page_id, page_name, 
+                tbs_user_id, hours, duration, ads_plan_id, req_status, req_status_id
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+            ) RETURNING tbs_ad_id
+        `;
+        const values = [
+            client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, 
+            uploadAdUrl, ad_file_size, ad_file_type, status_id, tbs_client_id, page_id, page_name, 
+            tbs_user_id, hours, duration, ads_plan_id, req_status, req_status_id
+        ];
+        const result = await pool.query(insertAds, values);
+        tbs_ad_id = result.rows[0].tbs_ad_id;
+
+        // Add the tbs_ad_id to the respective user table
+        if (tbs_user_id.startsWith('tbs-pro_emp')) {
+            await pool.query(
+                `UPDATE pro_emp_personal_details SET advertisements = array_append(advertisements, $1) WHERE tbs_pro_emp_id = $2`,
+                [tbs_ad_id, tbs_user_id]
+            );
+        } else if (tbs_user_id.startsWith('tbs-pro')) {
+            await pool.query(
+                `UPDATE product_owner_tbl SET advertisements = array_append(advertisements, $1) WHERE owner_id = $2`,
+                [tbs_ad_id, tbs_user_id]
+            );
+        }
+
+        res.status(201).json({ message: "Advertisement inserted successfully!" });
+
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal Server Error', details: error.message });
+    }
+};
+
+
+
+//UPDATE ADVERTISEMENT BY ID
+const putAds = async (req, res) => {
+    const ID = req.params.tbs_ad_id;
+    const {
+        client_details, ad_title, start_date, end_date, ad_description,
+        usage_per_day, status, ad_video, status_id, tbs_client_id,
+        page_id, page_name, tbs_user_id, hours, duration, ads_plan_id
+    } = req.body;
 
     // Check if file upload exceeded size limit
     if (req.file && req.file.size > 15 * 1024 * 1024) {
         return res.status(400).send('File size exceeded (Max: 15MB)');
     }
 
-    // Check if uploaded file mimetype is allowed
-    if (!['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'image/gif'].includes(req.file.mimetype)) {
-        return res.status(400).send('Only .jpeg, .jpg, .png, .mp4, and .gif files are allowed');
-    }
-
-
-    const uploadAdUrl = req.file ? `/advertisement_files/${req.file.filename}` : null;
+    const putAdUrl = req.file ? `/advertisement_files/${req.file.filename}` : null;
     const ad_file_size = req.file ? req.file.size : null;
     const ad_file_type = req.file ? req.file.mimetype : null;
 
-    console.log(uploadAdUrl);
+    let updateAds = `
+        UPDATE advertisements_tbl 
+        SET client_details = $1,
+            ad_title = $2,
+            start_date = $3,
+            end_date = $4,
+            ad_description = $5,
+            usage_per_day = $6,
+            status = $7,
+            ad_video = $8,
+            ad_file_size = $9,
+            ad_file_type = $10,
+            status_id = $11,
+            tbs_client_id = $12,
+            page_id = $13,
+            page_name = $14,
+            tbs_user_id = $15,
+            hours = $16, 
+            duration = $17,
+            ads_plan_id = $18,
+            updated_date = now()
+        WHERE tbs_ad_id = $19
+    `;
 
-    
-    let employeeName = '';
-    let isActive = false;
+    const values = [
+        client_details, ad_title, start_date, end_date, ad_description,
+        usage_per_day, status, putAdUrl, ad_file_size, ad_file_type,
+        status_id, tbs_client_id, page_id, page_name, tbs_user_id,
+        hours, duration, ads_plan_id, ID
+    ];
 
-    // Check the user type based on tbs_user_id
-    if (tbs_user_id.startsWith('tbs-pro_emp')) {
-        // pro_emp case: Check pro_emp_personal_details table
-        const employeeResult = await pool.query(
-            `SELECT * FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`,
-            [tbs_user_id]
-        );
-
-        if (employeeResult.rows.length === 0) {
-            return res.status(404).json({ message: 'Employee not found' });
+    pool.query(updateAds, values, (err, result) => {
+        if (!err) {
+            res.status(200).send('Updated successfully!');
+        } else {
+            console.log(err.message);
+            res.status(201).send("Error updating advertisements");
         }
-
-        const employee = employeeResult.rows[0];
-        isActive = employee.emp_status_id === 1 && employee.emp_status.toLowerCase() === 'active';
-        employeeName = employee.emp_first_name || 'Unknown';
-
-    } else if (tbs_user_id.startsWith('tbs-pro')) {
-        // pro case: Check product_owner_id table
-        const ownerResult = await pool.query(
-            `SELECT * FROM product_owner_tbl WHERE owner_id = $1`,
-            [tbs_user_id]
-        );
-
-        if (ownerResult.rows.length === 0) {
-            return res.status(404).json({ message: 'Product owner not found' });
-        }
-
-        const owner = ownerResult.rows[0];
-        employeeName = owner.owner_name || 'Unknown';
-        isActive = true; 
-    } else {
-        return res.status(400).json({ message: 'Invalid user ID type' });
-    }
-
-    if (!isActive) {
-        return res.status(400).json({ message: 'Employee status is not active' });
-    }
-
-
-    try{
-        const insertAds = `INSERT INTO advertisements_tbl (  client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, ad_video, ad_file_size, ad_file_type, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`;
-        const values = [ client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, uploadAdUrl, ad_file_size, ad_file_type, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id];
-
-        const result = await pool.query(insertAds, values); 
-         res.send("Inserted Successfully!");
-        } catch (err) {
-            console.error(err);
-            return res.status(501).send("Error inserting advertisements");
-        }
-        };
-
-
-//UPDATE ADVERTISEMENT BY ID
-    const putAds = async (req, res) => {
-            const ID = req.params.tbs_ad_id;
-            const { client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, ad_video, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id} = req.body;
-        
-            
-            // Check if file upload exceeded size limit
-            if (req.file && req.file.size > 15 * 1024 * 1024) {
-                return res.status(400).send('File size exceeded (Max: 15MB)');
-            }
-        
-            // Check if uploaded file mimetype is allowed
-            if (!['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'image/gif'].includes(req.file.mimetype)) {
-                return res.status(400).send('Only .jpeg, .jpg, .png, .mp4, and .gif files are allowed');
-            }
-        
-            
-            const putAdUrl = req.file ? `/advertisement_files/${req.file.filename}` : null;
-            const ad_file_size = req.file ? req.file.size : null;
-            const ad_file_type = req.file ? req.file.mimetype : null;
-        
-            let updateAds = `UPDATE advertisements_tbl 
-            SET client_details = $1,
-                        ad_title = $2,
-                        start_date = $3,
-                        end_date = $4,
-                        ad_description = $5,
-                        usage_per_day = $6,
-                        status = $7,
-                        ad_video = $8,
-                        ad_file_size = $9,
-                        ad_file_type = $10,
-                        status_id = $11,
-                        tbs_client_id = $12,
-                        page_id = $13,
-                        page_name = $14,
-                        tbs_user_id = $15,
-                        hours = $16, 
-                        duration = &17,
-                        ads_plan_id = $18
-                        WHERE tbs_ad_id = $19`;
-        
-            const values = [client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, putAdUrl,  ad_file_size, ad_file_type, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id, ID];
-        
-            pool.query(updateAds, values, (err, result) => {
-                if (!err) {
-                    res.status(200).send('Updated successfully!')
-                } else {
-                    console.log(err.message);
-                    res.status(201).send("Error updating advertisements");
-                }
-            });
-        };
-
+    });
+}
 
 //SEARCH ADVERTISEMENT BY CLIENT-NAME, TITLE, DATE AND STATUS
         const searchAdvertisements = async (req, res) => {
@@ -272,5 +462,33 @@ const postAd = async (req, res) => {
             }
         };
 
-module.exports = {getAd, getAdbyId, deleteAd, postAd, putAds, searchAdvertisements, getClientRecords, getClientDetails, getAdbyStatus, getCombinedData};
+// GET RECENTLY ADDED ADVERTISEMENTS
+const getRecentAds = async (req, res) => {
+    try {
+        const getRecentAdsQuery = `
+            SELECT * FROM advertisements_tbl WHERE ad_video != 'null' 
+            ORDER BY created_date DESC 
+            LIMIT 6`;
+        const result = await pool.query(getRecentAdsQuery);
+        res.status(200).send(result.rows);
+    } catch (err) {
+        console.log(err.message);
+        res.status(500).json({ message: "Error getting records" });
+    }
+};
+
+// ACTIVE ADVERTISEMENTS GET CONTROLLER
+const getActiveAds = async (req, res) => {
+    try {
+        const result = await pool.query(`SELECT * FROM advertisements_tbl WHERE status_id = 3`);
+        console.log(result);
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.error('Error', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+
+module.exports = {getAd, getAdbyId, deleteAd, postAd, putAds, searchAdvertisements, getClientRecords, getClientDetails, getAdbyStatus, getCombinedData, getRecentAds, getActiveAds};
 

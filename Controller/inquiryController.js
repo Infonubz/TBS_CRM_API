@@ -1,61 +1,71 @@
-const pool = require('../config/db')
-const nodemailer = require('nodemailer')
-
-const transporter = nodemailer.createTransport({
-    host: 'smtp.office365.com',
-    port: 587,
-    secure: false,
-    auth: {
-        user: 'no-reply@thebusstand.com',
-        pass: 'rplmdzbzdqgrhgwf',
-    },
-})
+const pool = require('../config/db');
+const nodemailer = require('nodemailer');
+require('dotenv').config();
 
 const Inquiry = async (req, res) => {
     const { name, phone, email, message } = req.body;
 
-    if(!name || !phone || !email || !message){
+    if (!name || !phone || !email || !message) {
         return res.status(400).json({ error: 'Missing required fields' });
     }
 
     try {
-        
-      const user =  await pool.query(
-            'INSERT INTO public.inquiries_tbl(name, phone, email, message) VALUES($1, $2, $3, $4)',
-            [name, phone, email, message]
-        )
+        // Fetch email addresses from config_email_information
+        const configQuery = `
+            SELECT 
+                support->>'email' as support_email,
+                no_reply->>'email' as no_reply_email
+            FROM config_email_information
+            LIMIT 1
+        `;
+        const configResult = await pool.query(configQuery);
 
-        console.log(req.body);
+        if (configResult.rows.length === 0) {
+            return res.status(500).json({ error: 'Failed to retrieve email configuration' });
+        }
+
+        const { support_email, no_reply_email } = configResult.rows[0];
+
+        // Create and configure the transporter
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.office365.com',
+            port: 587,
+            secure: false,
+            auth: {
+                user: no_reply_email,
+                pass: process.env.INQUIRY_PASS, // Consider fetching this securely
+            },
+        });
 
         const mailOptions = {
-            from: 'no-reply@thebusstand.com', 
-            to: 'support@thebusstand.com',
-            subject: 'New Inquiry from ' + name, 
+            from: no_reply_email,
+            to: support_email,
+            subject: 'New Inquiry from ' + name,
             html: `
-             <html>
-                <body>
-                    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
-                    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
-                        <div style="background-color: #003366; padding: 20px; color: #ffffff; text-align: center;">
-                        <h1 style="margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 1px;">TheBusStand</h1>
+                <html>
+                    <body>
+                        <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+                            <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+                                <div style="background-color: #003366; padding: 20px; color: #ffffff; text-align: center;">
+                                    <h1 style="margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 1px;">TheBusStand</h1>
+                                </div>
+                                <div style="padding: 20px; background-color: #f9f9f9;">
+                                    <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-bottom: 20px; text-transform: capitalize; font-size: 22px;">New Inquiry from ${name}</h2>
+                                    <div style="margin-bottom: 20px;">
+                                        <p style="margin: 0 0 10px;"><strong>Name:</strong> ${name}</p>
+                                        <p style="margin: 0 0 10px;"><strong>Phone:</strong> ${phone}</p>
+                                        <p style="margin: 0 0 10px;"><strong>Email:</strong> ${email}</p>
+                                        <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
+                                        <div style="border: 1px dashed #1F487C; padding: 15px; border-radius: 5px;">${message}</div>
+                                    </div>
+                                </div>
+                                <div style="background-color: #003366; padding: 15px; text-align: center; color: #ffffff; border-top: 1px solid #e0e0e0;">
+                                    <p style="margin: 0;">&copy; ${new Date().getFullYear()} TheBusStand. All rights reserved.</p>
+                                </div>
+                            </div>
                         </div>
-                        <div style="padding: 20px; background-color: #f9f9f9;">
-                        <h2 style="color: #003366; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-bottom: 20px; text-transform: capitalize; font-size: 22px;">New Inquiry from ${name}</h2>
-                        <div style="margin-bottom: 20px;">
-                            <p style="margin: 0 0 10px;"><strong>Name:</strong> ${name}</p>
-                            <p style="margin: 0 0 10px;"><strong>Phone:</strong> ${phone}</p>
-                            <p style="margin: 0 0 10px;"><strong>Email:</strong> ${email}</p>
-                            <p style="margin: 0 0 10px;"><strong>Message:</strong></p>
-                            <div style="border: 1px dashed #1F487C; padding: 15px; border-radius: 5px; background-color: #D2DAE5;">${message}</div>
-                        </div>
-                        </div>
-                        <div style="background-color: #003366; padding: 15px; text-align: center; color: #ffffff; border-top: 1px solid #e0e0e0;">
-                        <p style="margin: 0;">&copy; ${new Date().getFullYear()} TheBusStand. All rights reserved.</p>
-                        </div>
-                    </div>
-                    </div>
-                </body>
-            </html>
+                    </body>
+                </html>
             `,
         };
 

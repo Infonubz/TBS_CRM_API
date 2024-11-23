@@ -3,7 +3,7 @@ const express = require('express');
 const pool = require('../dbconnection.js');
 
 //GET DATA FROM OP_DETAILS, OP_TBL AND SUBSCRIPTIONS
-const getAllRecords =  async (req, res) => {
+const getAllRecords = async (req, res) => {
     try {
         const query = `
         SELECT 
@@ -31,18 +31,21 @@ const getAllRecords =  async (req, res) => {
         WHERE 
           o.user_status_id = 1
       `;  
-      try {
+      
         const { rows } = await pool.query(query);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No active records found!' });
+        }
+
         res.json(rows);
-      } catch (dbError) {
-        console.error('Error executing query', dbError.stack);
-        res.status(500).json({ error: 'Error executing query' });
-      }
+
     } catch (error) {
-      console.error('Unexpected error', error.stack);
-      res.status(500).json({ error: 'Internal Server Error' });
+        console.error('Error executing query', error.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
-  };
+};
+
 
   
 //GET ALL SUBSCRIPTIONS
@@ -52,7 +55,7 @@ const getSubscriptions = async (req, res) => {
         res.status(200).send(result.rows);
     } catch(err) {
         console.log(err.message);
-        res.status(500).send("Error getting records");
+        res.status(500).json({ error : "Error getting records" });
     }
 };
 
@@ -60,13 +63,13 @@ const getSubscriptions = async (req, res) => {
 //GET SUBSCRIPTION BY ID
 const getSubscriptionbyId = async (req, res) => {
     try{
-        const id = req.params.operator_id;
-        const getSub = `SELECT * FROM subscriptions_tbl WHERE operator_id = $1`;
+        const id = req.params.tbs_operator_id;
+        const getSub = `SELECT * FROM subscriptions_tbl WHERE tbs_operator_id = $1`;
         const result = await pool.query(getSub, [id]);
         res.status(200).send(result.rows);
     } catch(err) {
         console.log(err.message);
-        res.status(500).send("Error getting records");
+        res.status(500).json({ error : "Error getting records"});
     }
 };
 
@@ -74,13 +77,13 @@ const getSubscriptionbyId = async (req, res) => {
 const deleteSubscription = async (req,res) => {
     
     try{
-    const id = req.params.operator_id;
-    const removeSub = 'DELETE FROM subscriptions_tbl WHERE operator_id = $1';
+    const id = req.params.tbs_operator_id;
+    const removeSub = 'DELETE FROM subscriptions_tbl WHERE tbs_operator_id = $1';
     const result = await pool.query(removeSub, [id]);
     res.status(200).send('Deleted successfully!');
     } catch(err) {
         console.log(err);
-        res.status(500).send('Error deleting record');
+        res.status(500).json({ error : "Error deleting record" });
     }
 };
 
@@ -95,11 +98,11 @@ const postSubscription = async (req, res) => {
     try{
         let insertSub = `INSERT INTO subscriptions_tbl (end_date, plan_name, plan_type) VALUES ($1,$2,$3)`;
         const result = await pool.query(insertSub, [end_date, plan_name, plan_type ]);
-        res.status(201).send("Inserted successfully!");
+        res.status(201).json({ message : "Inserted successfully!" });
         console.log(result);
     } catch (err){ 
         console.log(err.message);
-        res.status(500).send("Error inserting record");
+        res.status(500).json({ error : "Error inserting record" });
     }    
 };
 
@@ -116,15 +119,15 @@ const putSubscription = async (req, res) => {
         end_date = $1,
         plan_name = $2,
         plan_type = $3
-        WHERE operator_id = $4`;
-        const ID = req.params.operator_id;
+        WHERE tbs_operator_id = $4`;
+        const ID = req.params.tbs_operator_id;
         const values = [end_date, plan_name, plan_type, ID];
         await pool.query(updateSub, values);
-        res.status(201).send("Updated successfully!");
+        res.status(201).send({ message : "Updated successfully!" });
        
     } catch (err){
         console.log(err.message);
-        res.status(500).send("Error updating records");
+        res.status(500).json({ error : "Error updating records"});
     }         
 };
 
@@ -145,17 +148,22 @@ const searchSubscription = async (req, res) => {
                OR (TO_CHAR(created_date, 'Mon') || ' ' || TO_CHAR(created_date, 'DD')) ILIKE $1
                OR (TO_CHAR(end_date, 'Mon') || ' ' || TO_CHAR(end_date, 'DD')) ILIKE $1
         `;
-        
     
         const queryParams = [searchValue];
 
         const result = await pool.query(query, queryParams);
+
+        if (result.rows.length === 0) {
+            return res.json({ message: 'No records found matching the search term.' });
+        }
+
         res.json(result.rows);
     } catch (err) {
         console.error('Error executing query', err);
         res.status(500).json({ error: 'Error searching records' });
     }
 };
+
 
 
 module.exports = {getAllRecords, getSubscriptions, getSubscriptionbyId, deleteSubscription, postSubscription, putSubscription, searchSubscription};

@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx')
 const path = require('path');
-const { getMobAd, getMobAdbyId, getClientRecordsMob, getClientDetailsMob, postMobAd, putMobAds, searchMobAdvertisements, deleteMobAd, getCombinedDataMob, getMobAdbyStatus } = require('../Controller/Mobile_advertisements_controller');
+const { getMobAd, getMobAdbyId, getClientRecordsMob, getClientDetailsMob, postMobAd, putMobAds, searchMobAdvertisements, deleteMobAd, getCombinedDataMob, getMobAdbyStatus, getRecentMobAds } = require('../Controller/Mobile_advertisements_controller');
 
 
 const MobadvertisementRouter = express.Router();
@@ -48,5 +48,6 @@ MobadvertisementRouter.put("/mobads/:tbs_mobad_id", mobad_upload.single('mobad_v
 MobadvertisementRouter.delete('/mobads/:tbs_mobad_id', deleteMobAd);
 MobadvertisementRouter.get('/mobads-all', getCombinedDataMob);
 MobadvertisementRouter.get('/mobadStatus/:status_id', getMobAdbyStatus);
+MobadvertisementRouter.get('/recentMobAds', getRecentMobAds);
 
 module.exports = { MobadvertisementRouter };

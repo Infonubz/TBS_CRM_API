@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx')
 const path = require('path');
-const { searchAdvertisements, getAd, getAdbyId, postAd, putAds, deleteAd, getClientRecords, getClientDetails, getAdbyStatus, getCombinedData } = require('../Controller/Advertisements_controller');
+const { searchAdvertisements, getAd, getAdbyId, postAd, putAds, deleteAd, getClientRecords, getClientDetails, getAdbyStatus, getCombinedData, getRecentAds, getActiveAds } = require('../Controller/Advertisements_controller');
 
 const advertisementRouter = express.Router();
 
@@ -18,19 +18,20 @@ const ad_storage = multer.diskStorage({
 
 const ad_upload = multer({ 
     storage: ad_storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, 
+    limits: { fileSize: 15 * 1024 * 1024 }, 
     fileFilter: (req, file, cb) => {
         const allowedMimeTypes = [
             'image/jpeg', 
             'image/jpg',
-            'image/png', 
+            'image/png',
+            'image/gif', 
             'application/pdf',
             'video/mp4'
         ];
         if (allowedMimeTypes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('Only .jpeg, .jpg, .png, .pdf, .mp4 files are allowed'), false);
+            cb(new Error('Only .jpeg, .jpg, .png, .gif, .pdf, .mp4 files are allowed'), false);
         }
     }
 });
@@ -47,5 +48,7 @@ advertisementRouter.put("/ads/:tbs_ad_id", ad_upload.single('ad_video'), putAds)
 advertisementRouter.delete('/ads/:tbs_ad_id', deleteAd);
 advertisementRouter.get('/adStatus/:status_id', getAdbyStatus);
 advertisementRouter.get('/ads-all', getCombinedData);
+advertisementRouter.get('/recentAds', getRecentAds);
+advertisementRouter.get('/Active-Ads', getActiveAds);
 
 module.exports = { advertisementRouter };

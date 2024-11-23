@@ -1,17 +1,16 @@
 const pool = require('../config/db')
 const jwt = require('jsonwebtoken')
+const path = require('path')
+const xlsx = require('xlsx')
+const fs = require('fs');
+const XLSX = require('xlsx');
 
 // operator_personal_details POST CONTROLLER
 const postOperator = async (req, res) => {
-    const { company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id } = req.body;
+    const { company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id } = req.body
     
-        const type_name = 'SUPERADMIN';
-        const type_id = 'SPA101';
-        const JWT_SECRET_KEY = 'your_secret_key'
-
-        if(!company_name || !owner_name || !phone || !alternate_phone || !emailid || !alternate_emailid || !aadharcard_number || !pancard_number || !user_status || !req_status || !user_status_id || !req_status_id){
-            return res.status(400).json({ error: 'Missing required fields' })
-        }
+        const type_name = 'OPERATOR'
+        const type_id = 'OP101'
     
         try {
             const result = await pool.query(
@@ -20,32 +19,24 @@ const postOperator = async (req, res) => {
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING tbs_operator_id`,
                 [company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id]
             );
-    
+            
             const tbs_operator_id = result.rows[0].tbs_operator_id;
     
             console.log(`New operator created with ID: ${tbs_operator_id}`);
     
-            const password = `SPA@${tbs_operator_id}`;
+            const password = `OP@${tbs_operator_id}`;
     
             await pool.query(
                 `UPDATE operators_tbl SET password = $1 WHERE tbs_operator_id = $2`,
                 [password, tbs_operator_id]
-            );
-    
-          
-            const token = jwt.sign({ tbs_operator_id }, JWT_SECRET_KEY, { expiresIn: '1h' })
-            await pool.query(
-                `UPDATE operators_tbl SET token = $1 WHERE tbs_operator_id = $2`,
-                [token, tbs_operator_id]
-              )
+            )
     
             res.status(201).json({
                 message: 'Operator Created Successfully',
                 id: tbs_operator_id,
                 password: password,
                 type_name: type_name,
-                type_id: type_id,
-                token: token 
+                type_id: type_id
             });
         } catch (err) {
             console.error('Error inserting into database:', err);
@@ -134,44 +125,6 @@ const putOperatorProfileImg = async (req, res) => {
     }
 }
 
-const getOperatorProfileImgByid = async (req, res) => {
-    const tbs_operator_id = req.params.tbs_operator_id;
-
-    const profileimg = req.file ? `/operator_files/${req.file.filename}` : null;
-    try {
-        const updateOperatorsQuery = `
-        SELECT
-            profileimg FROM operators_tbl
-        WHERE tbs_operator_id = $1
-        `;
-        const operatorsValues = [
-            tbs_operator_id 
-        ];
-        const operatorsResult = await pool.query(updateOperatorsQuery, operatorsValues)
-        res.status(200).json(operatorsResult.rows[0]);
-    } catch (error) {
-        console.error('Error updating operator and details:', error);
-        res.status(500).json({ error: 'Error updating operator and details.' });
-    }
-}
-
-
-const getOperatorProfileImg = async (req, res) => {
-
-    const profileimg = req.file ? `/operator_files/${req.file.filename}` : null;
-    try {
-        const updateOperatorsQuery = `
-        SELECT
-            profileimg FROM operators_tbl;
-        `;
-        const operatorsResult = await pool.query(updateOperatorsQuery)
-        res.status(200).json(operatorsResult.rows);
-    } catch (error) {
-        console.error('Error updating operator and details:', error);
-        res.status(500).json({ error: 'Error updating operator and details.' });
-    }
-}
-
 // operator_personal_details DELETE CONTROLLER
 const deleteOperator = async (req, res) => {
     const id= req.params.tbs_operator_id 
@@ -230,36 +183,17 @@ const getOperator = async (req, res) => {
 
 // operator_personal_details GETbyID CONTROLLER
 const getOperatorByID = async (req, res) => {
-    const id = req.params.tbs_operator_id
-    try {
-        const query = `
-            SELECT tbs_operator_id,
-            company_name,
-            owner_name,
-            phone,
-            alternate_phone,
-            emailid,
-            alternate_emailid,
-            aadharcard_number,
-            pancard_number,
-            user_status,
-            req_status,
-            user_status_id,
-            req_status_id
-            FROM public.operators_tbl WHERE tbs_operator_id = $1
-        `;
-        const result = await pool.query(query);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'No operators found' });
-        }
-
-        res.status(200).json(result.rows);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Database query failed' });
+    try{
+        const id = req.params.tbs_operator_id;
+        const getOperatorByID = `SELECT * FROM operators_tbl WHERE tbs_operator_id = $1`;
+        const result = await pool.query(getOperatorByID,[id]);
+        res.status(200).send(result.rows);
+    } catch(err) {
+        console.log(err.message);
+        res.status(500).send("Error getting records");
     }
-}
+};
+
 
 // email validation CONTROLLER
 const Emailvalidation = async (req, res) => {
@@ -293,9 +227,9 @@ try {
 
 // search CONTROLLER
 const searchOperator = async (req, res) => {
-    const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : ''; // Check if search_term is provided
-
-    console.log(searchTerm); // Optional: Log the received searchTerm for debugging
+    const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : ''
+    
+    console.log(searchTerm)
 
     try {
         let query;
@@ -325,7 +259,7 @@ const searchOperator = async (req, res) => {
         
         if (rows.length === 0) {
 
-            return res.status(200).json('No operators found' );
+            return res.status(200).json(rows);
         }
 
         res.status(200).json(rows);
@@ -341,45 +275,61 @@ const operator_details = async (req, res) => {
     const tbs_operator_id = req.params.tbs_operator_id;
 
     const {
-        has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin, head_office,
         type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code,
-        address, state, region, city, country, zip_code, state_id, country_id, city_id
+        address, state, region, city, country, zip_code, state_id, country_id, city_id,
+        has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin, head_office,
     } = req.body;
 
     // File uploads
-
     const upload_gst = req.files && req.files['upload_gst'] ? `/operator_files/${req.files['upload_gst'][0].filename}` : null;
     const aadar_front_doc = req.files && req.files['aadar_front_doc'] ? `/operator_files/${req.files['aadar_front_doc'][0].filename}` : null;
     const aadar_back_doc = req.files && req.files['aadar_back_doc'] ? `/operator_files/${req.files['aadar_back_doc'][0].filename}` : null;
     const pancard_front_doc = req.files && req.files['pancard_front_doc'] ? `/operator_files/${req.files['pancard_front_doc'][0].filename}` : null;
     const pancard_back_doc = req.files && req.files['pancard_back_doc'] ? `/operator_files/${req.files['pancard_back_doc'][0].filename}` : null;
-    const msme_doc = req.files && req.files ['msme_doc'] ? `/operator_files/${req.files['msme_doc'][0].filename}` : null;
+    const msme_doc = req.files && req.files['msme_doc'] ? `/operator_files/${req.files['msme_doc'][0].filename}` : null;
 
+    const aadarFrontFile = req.files && req.files['aadar_front_doc'] ? {
+        type: req.files['aadar_front_doc'][0].mimetype,
+        filename: req.files['aadar_front_doc'][0].filename,
+        path: req.files['aadar_front_doc'][0].path,
+        size: req.files['aadar_front_doc'][0].size,
+        created_date: new Date().toISOString()
+    } : null;
+
+    const aadarBackFile = req.files && req.files['aadar_back_doc'] ? {
+        type: req.files['aadar_back_doc'][0].mimetype,
+        filename: req.files['aadar_back_doc'][0].filename,
+        path: req.files['aadar_back_doc'][0].path,
+        size: req.files['aadar_back_doc'][0].size,
+        created_date: new Date().toISOString()
+    } : null;
+
+    const pancardFrontFile = req.files && req.files['pancard_front_doc'] ? {
+        type: req.files['pancard_front_doc'][0].mimetype,
+        filename: req.files['pancard_front_doc'][0].filename,
+        path: req.files['pancard_front_doc'][0].path,
+        size: req.files['pancard_front_doc'][0].size,
+        created_date: new Date().toISOString()
+    } : null;
+
+    const pancardBackFile = req.files && req.files['pancard_back_doc'] ? {
+        type: req.files['pancard_back_doc'][0].mimetype,
+        filename: req.files['pancard_back_doc'][0].filename,
+        path: req.files['pancard_back_doc'][0].path,
+        size: req.files['pancard_back_doc'][0].size,
+        created_date: new Date().toISOString()
+    } : null;
+
+    const msmeDocFile = req.files && req.files['msme_doc'] ? {
+        type: req.files['msme_doc'][0].mimetype,
+        filename: req.files['msme_doc'][0].filename,
+        path: req.files['msme_doc'][0].path,
+        size: req.files['msme_doc'][0].size,
+        created_date: new Date().toISOString()
+    } : null;
 
     try {
         await pool.query('BEGIN');
-
-        // Update address details
-        if (address || state || region || city || country || state_id || country_id || city_id ) {
-            const addressUpdateQuery = `
-                UPDATE operator_details
-                SET
-                    address = COALESCE($2, address),
-                    state = COALESCE($3, state),
-                    region = COALESCE($4, region),
-                    city = COALESCE($5, city),
-                    country = COALESCE($6, country),
-                    zip_code = COALESCE($7, zip_code),
-                    state_id = COALESCE($8, state_id),
-                    country_id  = COALESCE($9, country_id),
-                    city_id = COALESCE($10, city_id)
-                WHERE
-                    tbs_operator_id = $1
-            `;
-            await pool.query(addressUpdateQuery, [
-                tbs_operator_id, address, state, region, city, country, zip_code, state_id, country_id, city_id
-            ]);
-        }
 
         // Update business details
         if (type_of_constitution || business_background || msme_type || msme_number || type_of_service || currency_code) {
@@ -397,6 +347,28 @@ const operator_details = async (req, res) => {
             `;
             await pool.query(operatorUpdateQuery, [
                 tbs_operator_id, type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code
+            ]);
+        }
+
+        // Update address details
+        if (address || state || region || city || country || zip_code || state_id || country_id || city_id) {
+            const addressUpdateQuery = `
+                UPDATE operator_details
+                SET
+                    address = COALESCE($2, address),
+                    state = COALESCE($3, state),
+                    region = COALESCE($4, region),
+                    city = COALESCE($5, city),
+                    country = COALESCE($6, country),
+                    zip_code = COALESCE($7, zip_code),
+                    state_id = COALESCE($8, state_id),
+                    country_id = COALESCE($9, country_id),
+                    city_id = COALESCE($10, city_id)
+                WHERE
+                    tbs_operator_id = $1
+            `;
+            await pool.query(addressUpdateQuery, [
+                tbs_operator_id, address, state, region, city, country, zip_code, state_id, country_id, city_id
             ]);
         }
 
@@ -421,24 +393,10 @@ const operator_details = async (req, res) => {
                 aggregate_turnover_exceeded === 'true' ? true : aggregate_turnover_exceeded === 'false' ? false : null,
                 state_name, state_code_number, gstin, head_office, upload_gst, tbs_operator_id
             ]);
-            
-            if (gstin) {
-                const statusUpdateQuery = `
-                    UPDATE operators_tbl
-                    SET
-                        user_status = 'waiting',
-                        user_status_id = 3
-                    WHERE
-                        tbs_operator_id = $1
-                `;
-                
-                await pool.query(statusUpdateQuery, [tbs_operator_id]);
-            }
         }
-        
 
         // Update document details
-        if (aadar_front_doc || aadar_back_doc || pancard_front_doc || pancard_back_doc) {
+        if (aadar_front_doc || aadar_back_doc || pancard_front_doc || pancard_back_doc || aadarFrontFile || aadarBackFile || pancardFrontFile || pancardBackFile) {
             const documentUpdateQuery = `
                 UPDATE operator_details
                 SET
@@ -446,17 +404,33 @@ const operator_details = async (req, res) => {
                     aadar_back_doc = COALESCE($3, aadar_back_doc),
                     pancard_front_doc = COALESCE($4, pancard_front_doc),
                     pancard_back_doc = COALESCE($5, pancard_back_doc),
-                    msme_doc = COALESCE($6, msme_doc)
+                    msme_doc = COALESCE($6, msme_doc),
+                    aadar_front_file = COALESCE($7, aadar_front_file),
+                    aadar_back_file = COALESCE($8, aadar_back_file),
+                    pancard_front_file = COALESCE($9, pancard_front_file),
+                    pancard_back_file = COALESCE($10, pancard_back_file),
+                    msme_doc_file = COALESCE($11, msme_doc_file)
                 WHERE
                     tbs_operator_id = $1
             `;
+        
             await pool.query(documentUpdateQuery, [
-                tbs_operator_id, aadar_front_doc, aadar_back_doc, pancard_front_doc, pancard_back_doc, msme_doc
+                tbs_operator_id, 
+                aadar_front_doc, 
+                aadar_back_doc, 
+                pancard_front_doc, 
+                pancard_back_doc, 
+                msme_doc,
+                aadarFrontFile, 
+                aadarBackFile, 
+                pancardFrontFile, 
+                pancardBackFile,
+                msmeDocFile
             ]);
         }
-
+        
         await pool.query('COMMIT');
-
+        
         res.status(200).json({ message: 'Operator details updated successfully.' });
     } catch (error) {
         await pool.query('ROLLBACK');
@@ -553,33 +527,23 @@ const Operator_business_details = async (req, res) => {
 
 //OPERATOR_BUSINESS_DETAILS GETbyID CONTROLLER
 const Operator_detailsByID = async (req, res) => {
-
-    const id = req.params.tbs_operator_id;
-
     try {
-        const query = `
-        SELECT 
-        tbs_operator_id,
-        business_id,type_of_constitution,
-            business_background,
-            msme_type,
-            msme_number,
-            type_of_service,
-            currency_code
-        FROM operator_details WHERE tbs_operator_id = $1 ;
-        `;
-        const result = await pool.query(query, [id]);
-
-        if (result.rowCount === 0) {
-            return res.status(200).json({ message: 'Operator details not found' });
-        }
-        
-        res.status(200).send(result.rows);
+      const id = req.params.tbs_operator_id
+      const { rows } = await pool.query(`SELECT 
+      tbs_operator_id,
+      business_id,type_of_constitution,
+          business_background,
+          msme_type,
+          msme_number,
+          type_of_service,
+          currency_code
+      FROM operator_details WHERE tbs_operator_id = $1`, [id]);
+      res.json(rows);
     } catch (err) {
-        console.error('Error executing query', err.stack);
-        res.status(500).send('Server error');
+      console.error('Error executing query', err);
+      res.status(500).json({ error: 'Internal Server Error' });
     }
-}
+  }
 
 //OPERATOR_GST_DETAILS GET CONTROLLER
 const getGST = async (req, res) => {
@@ -646,10 +610,15 @@ const getDoc = async (req, res) => {
         const query = `
             SELECT tbs_operator_id,
                     aadar_front_doc,
+                    aadar_front_file,
                     aadar_back_doc,
+                    aadar_back_file,
                     pancard_front_doc,
+                    pancard_front_file,
                     pancard_back_doc,
-                    msme_doc
+                    pancard_back_file,
+                    msme_doc,
+                    msme_doc_file
             FROM operator_details ;
         `;
         
@@ -674,11 +643,16 @@ const getDocByID = async (req, res) => {
        const query = `
        SELECT 
        tbs_operator_id,
-       aadar_front_doc,
-                   aadar_back_doc,
-                   pancard_front_doc,
-                   pancard_back_doc,
-                   msme_doc
+                    aadar_front_doc,
+                    aadar_front_file,
+                    aadar_back_doc,
+                    aadar_back_file,
+                    pancard_front_doc,
+                    pancard_front_file,
+                    pancard_back_doc,
+                    pancard_back_file,
+                    msme_doc,
+                    msme_doc_file
        FROM operator_details WHERE tbs_operator_id = $1 ;
        `;
        const result = await pool.query(query, [id]);
@@ -697,7 +671,71 @@ const getDocByID = async (req, res) => {
 //update all operators details
 const putOperator = async (req, res) => {
     const tbs_operator_id = req.params.tbs_operator_id;
-const {
+    const {
+      company_name,
+      owner_name,
+      phone,
+      alternate_phone,
+      emailid,
+      alternate_emailid,
+      aadharcard_number,
+      pancard_number,
+      user_status,
+      req_status,
+      user_status_id,
+      req_status_id
+    } = req.body;
+  
+    const {
+      has_gstin,
+      aggregate_turnover_exceeded,
+      state_name,
+      state_code_number,
+      gstin,
+      head_office,
+      type_of_constitution,
+      business_background,
+      msme_type,
+      msme_number,
+      type_of_service,
+      currency_code,
+      address,
+      state,
+      region,
+      city,
+      country,
+      zip_code
+    } = req.body;
+  
+    const upload_gst = req.files['upload_gst'] ? `/operator_files/${req.files['upload_gst'][0].filename}` : null;
+    const aadar_front_doc = req.files['aadar_front_doc'] ? `/operator_files/${req.files['aadar_front_doc'][0].filename}` : null;
+    const aadar_back_doc = req.files['aadar_back_doc'] ? `/operator_files/${req.files['aadar_back_doc'][0].filename}` : null;
+    const pancard_front_doc = req.files['pancard_front_doc'] ? `/operator_files/${req.files['pancard_front_doc'][0].filename}` : null;
+    const pancard_back_doc = req.files['pancard_back_doc'] ? `/operator_files/${req.files['pancard_back_doc'][0].filename}` : null;
+    const msme_doc = req.files['msme_doc'] ? `/operator_files/${req.files['msme_doc'][0].filename}` : null;
+  
+    try {
+      await pool.query('BEGIN');
+  
+      const updateOperatorsQuery = `
+        UPDATE public.operators_tbl 
+        SET 
+          company_name = $1,
+          owner_name = $2,
+          phone = $3,
+          alternate_phone = $4,
+          emailid = $5,
+          alternate_emailid = $6,
+          aadharcard_number = $7,
+          pancard_number = $8,
+          user_status = COALESCE($9, user_status),
+          req_status = COALESCE($10, req_status),
+          user_status_id = COALESCE($11, user_status_id),
+          req_status_id = COALESCE($12, req_status_id)
+        WHERE tbs_operator_id = $13
+        RETURNING *;
+      `;
+      const operatorsValues = [
         company_name,
         owner_name,
         phone,
@@ -709,12 +747,48 @@ const {
         user_status,
         req_status,
         user_status_id,
-        req_status_id
-    } = req.body;
-
-    const {
-        has_gstin,
-        aggregate_turnover_exceeded,
+        req_status_id,
+        tbs_operator_id
+      ];
+      const operatorsResult = await pool.query(updateOperatorsQuery, operatorsValues);
+  
+      if (operatorsResult.rowCount === 0) {
+        await pool.query('ROLLBACK');
+        return res.status(404).json({ error: 'Operator not found' });
+      }
+  
+      const updateOperatorDetailsQuery = `
+        UPDATE public.operator_details 
+        SET 
+          has_gstin = COALESCE($1, has_gstin),
+          aggregate_turnover_exceeded = COALESCE($2, aggregate_turnover_exceeded),
+          state_name = COALESCE($3, state_name),
+          state_code_number = COALESCE($4, state_code_number),
+          gstin = COALESCE($5, gstin),
+          head_office = COALESCE($6, head_office),
+          type_of_constitution = COALESCE($7, type_of_constitution),
+          business_background = COALESCE($8, business_background),
+          msme_type = COALESCE($9, msme_type),
+          msme_number = COALESCE($10, msme_number),
+          type_of_service = COALESCE($11, type_of_service),
+          currency_code = COALESCE($12, currency_code),
+          address = COALESCE($13, address),
+          state = COALESCE($14, state),
+          region = COALESCE($15, region),
+          city = COALESCE($16, city),
+          country = COALESCE($17, country),
+          zip_code = COALESCE($18, zip_code),
+          upload_gst = COALESCE($19, upload_gst),
+          aadar_front_doc = COALESCE($20, aadar_front_doc),
+          aadar_back_doc = COALESCE($21, aadar_back_doc),
+          pancard_front_doc = COALESCE($22, pancard_front_doc),
+          pancard_back_doc = COALESCE($23, pancard_back_doc),
+          msme_doc = COALESCE($24, msme_doc)
+        WHERE tbs_operator_id = $25;
+      `;
+      const operatorDetailsValues = [
+        has_gstin === 'true' ? true : has_gstin === 'false' ? false : null,
+        aggregate_turnover_exceeded === 'true' ? true : aggregate_turnover_exceeded === 'false' ? false : null,
         state_name,
         state_code_number,
         gstin,
@@ -730,236 +804,304 @@ const {
         region,
         city,
         country,
-        zip_code
-    } = req.body;
-
-    const upload_gst = req.files['upload_gst'] ? `/operator_files/${req.files['upload_gst'][0].filename}` : null;
-    const aadar_front_doc = req.files['aadar_front_doc'] ? `/operator_files/${req.files['aadar_front_doc'][0].filename}` : null;
-    const aadar_back_doc = req.files['aadar_back_doc'] ? `/operator_files/${req.files['aadar_back_doc'][0].filename}` : null;
-    const pancard_front_doc = req.files['pancard_front_doc'] ? `/operator_files/${req.files['pancard_front_doc'][0].filename}` : null;
-    const pancard_back_doc = req.files['pancard_back_doc'] ? `/operator_files/${req.files['pancard_back_doc'][0].filename}` : null;
-    const msme_doc = req.files['msme_doc'] ? `/operator_files/${req.files['msme_doc'][0].filename}` : null;
-
-    try {
-        await pool.query('BEGIN')
-
-        const updateOperatorsQuery = `
-            UPDATE public.operators_tbl 
-            SET 
-                company_name = $1,
-                owner_name = $2,
-                phone = $3,
-                alternate_phone = $4,
-                emailid = $5,
-                alternate_emailid = $6,
-                aadharcard_number = $7,
-                pancard_number = $8,
-                user_status = COALESCE($9, user_status),
-                req_status = COALESCE($10, req_status),
-                user_status_id = COALESCE($11, user_status_id),
-                req_status_id = COALESCE($12, req_status_id)
-            WHERE tbs_operator_id = $13
-            RETURNING *;
-        `;
-        const operatorsValues = [
-            company_name,
-            owner_name,
-            phone,
-            alternate_phone,
-            emailid,
-            alternate_emailid,
-            aadharcard_number,
-            pancard_number,
-            user_status,
-            req_status,
-            user_status_id,
-            req_status_id,
-            tbs_operator_id
-        ];
-        const operatorsResult = await pool.query(updateOperatorsQuery, operatorsValues);
-
-        if (operatorsResult.rowCount === 0) {
-            await pool.query('ROLLBACK');
-            return res.status(404).json({ error: 'Operator not found' });
-        }
-
-        const updateOperatorDetailsQuery = `
-            UPDATE public.operator_details 
-            SET 
-                has_gstin = COALESCE($1, has_gstin),
-                aggregate_turnover_exceeded = COALESCE($2, aggregate_turnover_exceeded),
-                state_name = COALESCE($3, state_name),
-                state_code_number = COALESCE($4, state_code_number),
-                gstin = COALESCE($5, gstin),
-                head_office = COALESCE($6, head_office),
-                type_of_constitution = COALESCE($7, type_of_constitution),
-                business_background = COALESCE($8, business_background),
-                msme_type = COALESCE($9, msme_type),
-                msme_number = COALESCE($10, msme_number),
-                type_of_service = COALESCE($11, type_of_service),
-                currency_code = COALESCE($12, currency_code),
-                address = COALESCE($13, address),
-                state = COALESCE($14, state),
-                region = COALESCE($15, region),
-                city = COALESCE($16, city),
-                country = COALESCE($17, country),
-                zip_code = COALESCE($18, zip_code),
-                upload_gst = COALESCE($19, upload_gst),
-                aadar_front_doc = COALESCE($20, aadar_front_doc),
-                aadar_back_doc = COALESCE($21, aadar_back_doc),
-                pancard_front_doc = COALESCE($22, pancard_front_doc),
-                pancard_back_doc = COALESCE($23, pancard_back_doc),
-                msme_doc = COALESCE($24, msme_doc)
-            WHERE tbs_operator_id = $25;
-        `;
-        const operatorDetailsValues = [
-            has_gstin === 'true' ? true : has_gstin === 'false' ? false : null,
-            aggregate_turnover_exceeded === 'true' ? true : aggregate_turnover_exceeded === 'false' ? false : null,
-            state_name,
-            state_code_number,
-            gstin,
-            head_office,
-            type_of_constitution,
-            business_background,
-            msme_type,
-            msme_number,
-            type_of_service,
-            currency_code,
-            address,
-            state,
-            region,
-            city,
-            country,
-            zip_code,
-            upload_gst,
-            aadar_front_doc,
-            aadar_back_doc,
-            pancard_front_doc,
-            pancard_back_doc,
-            msme_doc,
-            tbs_operator_id
-        ];
-        await pool.query(updateOperatorDetailsQuery, operatorDetailsValues);
-
-        await pool.query('COMMIT')
-
-        res.status(200).json({ message: 'Operator and details updated successfully.' });
+        zip_code,
+        upload_gst,
+        aadar_front_doc,
+        aadar_back_doc,
+        pancard_front_doc,
+        pancard_back_doc,
+        msme_doc,
+        tbs_operator_id
+      ];
+      await pool.query(updateOperatorDetailsQuery, operatorDetailsValues);
+  
+      // Insert notification
+      await pool.query(
+        `INSERT INTO notification_tbl (table_name, action_type, record_id, message, read) VALUES ($1, $2, $3, $4, $5)`,
+        [
+          'operators_tbl',
+          'UPDATE',
+          tbs_operator_id,
+          `Operator with ID ${tbs_operator_id} was successfully updated.`,
+          false
+        ]
+      );
+  
+      await pool.query('COMMIT');
+  
+      res.status(200).json({ message: 'Operator and details updated successfully.' });
     } catch (error) {
-        await pool.query('ROLLBACK')
-        console.error('Error updating operator and details:', error);
-        res.status(500).json({ error: 'Error updating operator and details.' });
+      await pool.query('ROLLBACK');
+      console.error('Error updating operator and details:', error);
+      res.status(500).json({ error: 'Error updating operator and details.' });
     }
-}
-
+  }
+  
 // operator login
 const operatorLogin = async (req, res) => {
     const { emailid, phone, password } = req.body;
 
     try {
-        let operator
+        let operator;
 
         if (emailid) {
-            const emailResult = await pool.query('SELECT * FROM operators_tbl WHERE emailid = $1', [emailid]);
-            operator = emailResult.rows[0]
+            const emailResult = await pool.query('SELECT * FROM operators_tbl WHERE emailid = $1', 
+            
+            [emailid])
+            
+            operator = emailResult.rows[0];
         }
 
         if (!operator || phone) {
-            const phoneResult = await pool.query('SELECT * FROM operators_tbl WHERE phone = $1', [phone]);
-            operator = phoneResult.rows[0]; 
+
+            const phoneResult = await pool.query('SELECT * FROM operators_tbl WHERE phone = $1', 
+
+            [phone])
+
+            operator = phoneResult.rows[0];
         }
 
         if (!operator) {
+
             return res.status(404).json({ error: 'No operator found with provided email/phone' });
         }
 
         if (operator.password !== password) {
+
             return res.status(401).json({ error: 'Password incorrect' });
         }
 
         const operatorId = operator.tbs_operator_id;
-        const token = operator.token;
+        const companyName = operator.company_name;
+        const ownerName = operator.owner_name;
+        const typeName = operator.type_name;
+        const typeId = operator.type_id;
 
-        res.json({ id: operatorId, token : token})
+        const workbook = XLSX.utils.book_new();
+        const worksheetData = [
+            ['Email ID', 'Phone Number'],
+            [operator.emailid, operator.phone]
+        ];
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Operator Details')
+
+        const safeOwnerName = String(ownerName).replace(/[^a-zA-Z0-9]/g, '_')
+
+        const fileName = `${safeOwnerName}_Login_details.xlsx`
+
+        const filePath = path.join(__dirname, '..', 'operatorslogin_excels', fileName);
+
+        XLSX.writeFile(workbook, filePath);
+
+        const token = jwt.sign({ operatorId }, process.env.JWT_SECRET_KEY, { expiresIn: '1w' });
+
+        res.json({
+            id: operatorId,
+            company_name: companyName,
+            owner_name: ownerName,
+            type_name: typeName,
+            type_id: typeId,
+            token: token,
+            excelFilePath: filePath 
+        })
 
     } catch (error) {
-        res.status(500).json({ error: error.message })
+        res.status(500).json({ error: error.message });
     }
 }
 
+//get only profilr_img CONTROLLER
+const getImg = async (req, res) => {
 
-// Endpoint to handle Excel file upload
-const excelImport = async (req, res) => {
     try {
-        const file = req.file;
-        if (!file) {
-            return res.status(400).send('No file uploaded.');
+        const query = `
+            SELECT tbs_operator_id,
+            profileimg
+            FROM operators_tbl ;
+        `;
+        
+        const result = await pool.query(query);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Operator profile_img not found' });
         }
 
-        // Read the Excel file
-        const workbook = xlsx.read(file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = xlsx.utils.sheet_to_json(worksheet);
+        res.status(200).json(result.rows)
 
-        // Start a transaction
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
+    } catch (err) {
+        console.error('Error geting operator-profile_img:', err);
+        res.status(500).json({ error: 'Database getion failed' });
+    }
+}
 
-            for (const row of jsonData) {
-                // Insert into pro_emp_personal_details table
-                const personalDetailsQuery = `
-                    INSERT INTO pro_emp_personal_details (
-                        tbs_pro_emp_id, emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth,
-                        gender, blood_group, temp_add, temp_country, temp_state, temp_city, temp_zip_code, perm_add,
-                        perm_country, perm_state, perm_city, perm_zip_code, type_name, type_id, password, emp_status,
-                        emp_status_id, profile_img, role_type, role_type_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 
-                    $21, $22, $23, $24, $25, $26, $27, $28)
-                `;
-                const personalDetailsValues = [
-                    row.tbs_pro_emp_id, row.emp_first_name, row.emp_last_name, row.phone, row.email_id, row.alternate_phone,
-                    row.date_of_birth, row.gender, row.blood_group, row.temp_add, row.temp_country, row.temp_state, row.temp_city,
-                    row.temp_zip_code, row.perm_add, row.perm_country, row.perm_state, row.perm_city, row.perm_zip_code, row.type_name,
-                    row.type_id, row.password, row.emp_status, row.emp_status_id, row.profile_img, row.role_type, row.role_type_id
-                ];
-                await client.query(personalDetailsQuery, personalDetailsValues);
+//only img GETbyID CONTROLLER
+const getImgByID = async (req, res) => {
 
-                // Insert into pro_emp_professional_details table
-                const professionalDetailsQuery = `
-                    INSERT INTO pro_emp_professional_details (
-                        tbs_pro_emp_id, joining_date, designation, branch, official_email_id, years_of_experience,
-                        department, reporting_manager, aadhar_card_number, aadhar_card_doc, pan_card_number, pan_card_doc,
-                        work_experience_certificate, educational_certificate, other_documents, role_type,
-                        aadhar_card_file, pancard_file, work_experience_file, education_certificate_file, other_certificate_file
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-                `;
-                const professionalDetailsValues = [
-                    row.tbs_pro_emp_id, row.joining_date, row.designation, row.branch, row.official_email_id, row.years_of_experience,
-                    row.department, row.reporting_manager, row.aadhar_card_number, row.aadhar_card_doc, row.pan_card_number,
-                    row.pan_card_doc, row.work_experience_certificate, row.educational_certificate, row.other_documents,
-                    row.role_type, row.aadhar_card_file, row.pancard_file, row.work_experience_file, row.education_certificate_file,
-                    row.other_certificate_file
-                ];
-                await client.query(professionalDetailsQuery, professionalDetailsValues);
+    const id = req.params.tbs_operator_id
+    try {
+       const query = `
+       SELECT 
+       tbs_operator_id,
+       profileimg
+       FROM operators_tbl WHERE tbs_operator_id = $1 ;
+       `;
+       const result = await pool.query(query, [id]);
+
+       if (result.rowCount === 0) {
+           return res.status(200).json({ message: 'Operator profile_img not found' });
+       }
+       
+       res.status(200).send(result.rows);
+   } catch (err) {
+       console.error('Error executing query', err.stack);
+       res.status(500).send('Server error');
+        } 
+   }
+
+//excel uploading
+   const ImportExcel = async (req, res) => {
+    if (!req.file || !req.file.path) {
+        return res.status(400).send('No file uploaded.');
+    }
+console.log(req.file);
+    try {
+        const workbook = xlsx.readFile(req.file.path);
+        const sheet_name_list = workbook.SheetNames;
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
+
+        function excelSerialToDate(serial) {
+            const excelEpoch = moment('1899-12-30');
+            return excelEpoch.add(serial, 'days').format('YYYY-MM-DD');
+        }
+
+        for (const row of data) {
+            if (!isNaN(row.created_date)) {
+                row.created_date = excelSerialToDate(row.created_date);
             }
 
-            await client.query('COMMIT');
-            res.status(200).send('Data imported successfully');
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+            const {
+                company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
+                aadharcard_number, pancard_number, created_date, user_status, req_status,
+                user_status_id, req_status_id, type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code, address, state, region, city, country, zip_code, has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
+                head_office, state_id, country_id, city_id
+            } = row;
+
+            // Insert into operators_tbl
+            const operatorResult = await pool.query(
+                `INSERT INTO operators_tbl (
+                    company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
+                    aadharcard_number, pancard_number, created_date, user_status, req_status,
+                    user_status_id, req_status_id, type_name, type_id, password
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                RETURNING tbs_operator_id`,
+                [company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
+                aadharcard_number, pancard_number, created_date, user_status, req_status,
+                user_status_id, req_status_id, 'OPERATOR', 'OP101', ''] // Password will be updated later
+            );
+
+            const tbs_operator_id = operatorResult.rows[0].tbs_operator_id;
+
+            // Auto-generate password
+            const password = `OP@${tbs_operator_id}`;
+
+            // Update operators_tbl with the generated password
+            await pool.query(
+                `UPDATE operators_tbl
+                SET password = $1
+                WHERE tbs_operator_id = $2`,
+                [password, tbs_operator_id]
+            );
+
+            // Update operator_details (without file details)
+            await pool.query(
+                `UPDATE operator_details
+                SET
+                    type_of_constitution = $2,
+                    business_background = $3,
+                    msme_type = $4,
+                    msme_number = $5,
+                    type_of_service = $6,
+                    currency_code = $7,
+                    address = $8,
+                    state = $9,
+                    region = $10,
+                    city = $11,
+                    country = $12,
+                    zip_code = $13,
+                    has_gstin = $14,
+                    aggregate_turnover_exceeded = $15,
+                    state_name = $16,
+                    state_code_number = $17,
+                    gstin = $18,
+                    head_office = $19,
+                    state_id = $20,
+                    country_id = $21,
+                    city_id = $22
+                WHERE tbs_operator_id = $1;
+                `,
+                [tbs_operator_id, type_of_constitution, business_background, msme_type, msme_number,
+                type_of_service, currency_code, address, state, region, city, country, zip_code,
+                has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
+                head_office, state_id, country_id, city_id]
+            )
         }
+
+        res.send('File processed and data uploaded successfully');
     } catch (error) {
-        console.error('Error importing data:', error);
-        res.status(500).send('Internal server error');
+        console.error('Error uploading file:', error);
+        res.status(500).send('Error uploading file');
     }
-};
+}
 
+//get only profilr_img CONTROLLER
+const getEmail = async (req, res) => {
 
+    try {
+        const query = `
+                    SELECT 
+                            tbs_operator_id,
+                            emailid
+                    FROM 
+                            operators_tbl
+                    WHERE 
+                            user_status_id = 1;`;
+        
+        const result = await pool.query(query);
 
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Operator profile_img not found' });
+        }
 
-module.exports = { postOperator, putOperatorPersonal, deleteOperator, getOperator, Emailvalidation, phoneValidation, searchOperator, operator_details, getOperatorProfileImg, getOperatorProfileImgByid,
-    getOperator_address, getOperator_addressByID, Operator_business_details, Operator_detailsByID, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, excelImport }
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error('Error geting operator-profile_img:', err);
+        res.status(500).json({ error: 'Database getion failed' });
+    }
+}
+
+//only img GETbyID CONTROLLER
+const getEmailByID = async (req, res) => {
+
+    const id = req.params.tbs_operator_id
+    try {
+       const query = `
+       SELECT 
+       tbs_operator_id,
+       emailid
+       FROM operators_tbl WHERE tbs_operator_id = $1 ;
+       `;
+       const result = await pool.query(query, [id]);
+
+       if (result.rowCount === 0) {
+           return res.status(200).json({ message: 'Operator profile_img not found' });
+       }
+       
+       res.status(200).send(result.rows);
+        } catch (err) {
+        console.error('Error executing query', err.stack);
+        res.status(500).send('Server error')
+        } 
+   }
+
+module.exports = { postOperator, putOperatorPersonal, deleteOperator, getOperator, Emailvalidation, phoneValidation, searchOperator, operator_details, getOperator_address, getOperator_addressByID, Operator_business_details, Operator_detailsByID, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, getImg, getImgByID, ImportExcel, getEmail, getEmailByID }

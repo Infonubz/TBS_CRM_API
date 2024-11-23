@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const { postOffer, updateOffer, deleteoffers, getOffers, getOffersByID, ImportExcel, getOffer_ImgByID, getOfferImg, getOffersBytbsID, searchOffers } = require('../Controller/offers_deals_controller')
+const { postOffer, updateOffer, deleteoffers, getOffers, getOffersByID, ImportExcel, getOffer_ImgByID, getOfferImg, getOffersBytbsID, searchOffers, getActiveOffers, getRecentOffers, getOffersDealsByOccupation } = require('../Controller/offers_deals_controller')
 
 const offrouter = express.Router()
 
@@ -38,11 +38,14 @@ offrouter.post('/offers-deals', off_upload.fields([{name: 'offer_img'}, {name: '
 offrouter.put('/offers-deals/:tbs_offer_id', off_upload.fields([{name: 'offer_img'}, {name: 'theme'}]), updateOffer)
 offrouter.delete('/offers-deals/:tbs_offer_id', deleteoffers)
 offrouter.get('/offers-deals', getOffers)
+offrouter.get('/Active-offers-deals', getActiveOffers)
 offrouter.get('/offers-deals/:tbs_offer_id', getOffersByID)
 offrouter.post('/offers-deals-importExcel', off_upload.single('xlsxFile'), ImportExcel)
 offrouter.get('/offers-deals-Img', getOfferImg)
 offrouter.get('/offers-deals-Img/:tbs_offer_id', getOffer_ImgByID)
 offrouter.get('/offers-deal/:tbs_operator_id', getOffersBytbsID)
-offrouter.get('/offers-deals-search/:search_term', searchOffers)
+offrouter.get('/offers-deals-search/:search_term', searchOffers);
+offrouter.get('/recentOffers', getRecentOffers);
+offrouter.get('/offers-deals-occupation/:occupation_id', getOffersDealsByOccupation)
 
 module.exports = { offrouter }

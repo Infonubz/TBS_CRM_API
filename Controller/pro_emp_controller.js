@@ -6,52 +6,54 @@ const moment = require('moment')
 
 //employee-peraonal-details POST CONTROLLER
 const createEMPpro = async (req, res, next) => {
-  const { emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, role_type, role_type_id } = req.body
-
-  if (!emp_first_name || !emp_last_name || !phone || !email_id || !alternate_phone || !date_of_birth || !gender || !blood_group || !role_type || !role_type_id) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    const { emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, role_type, role_type_id, owner_id } = req.body;
+  
+    if (!emp_first_name || !emp_last_name || !phone || !email_id || !alternate_phone || !date_of_birth || !gender || !blood_group || !role_type || !role_type_id || !owner_id) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+  
+    const type_name = 'EMPLOYEE', type_id = 'PROEMP101', emp_status = 'active', emp_status_id = 1;
+  
+    try {
+        await pool.query('BEGIN');
+  
+        const ownerCheck = await pool.query(`SELECT * FROM product_owner_tbl WHERE owner_id = $1`, [owner_id]);
+  
+        if (ownerCheck.rowCount === 0) {
+            await pool.query('ROLLBACK');
+            return res.status(201).json({ message: 'Owner ID does not exist' });
+        }
+  
+        const result = await pool.query(
+            `INSERT INTO pro_emp_personal_details (emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, type_name, type_id, emp_status, emp_status_id, role_type, role_type_id, owner_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+            [emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, type_name, type_id, emp_status, emp_status_id, role_type, role_type_id, owner_id]
+        );
+  
+        const tbs_pro_emp_id = result.rows[0].tbs_pro_emp_id;
+        console.log(`New Employee created with ID: ${tbs_pro_emp_id}`);
+        
+        const password = `EMP@${tbs_pro_emp_id}`;
+        await pool.query(
+            `UPDATE pro_emp_personal_details SET password = $1 WHERE tbs_pro_emp_id = $2`,
+            [password, tbs_pro_emp_id]
+        );
+  
+        await pool.query('COMMIT');
+  
+        res.status(201).json({
+            message: 'Employee Created Successfully',
+            id: tbs_pro_emp_id,
+            password: password,
+            type_name: type_name,
+            type_id: type_id
+        });
+  
+    } catch (err) {
+        await pool.query('ROLLBACK');
+        console.error('Error creating employee:', err.message);
+        res.status(500).json({ error: err.message });
+    }
   }
-
-  const type_name = 'EMPLOYEE'
-  const type_id = 'EMP101'
-  const emp_status = 'active'
-  const emp_status_id = 1
-
-  try {
-      await pool.query('BEGIN')
-
-      const result = await pool.query(
-          `INSERT INTO pro_emp_personal_details (emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, type_name, type_id, emp_status, emp_status_id, role_type, role_type_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-          [emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, type_name, type_id, emp_status, emp_status_id, role_type, role_type_id]
-      )
-
-      const tbs_pro_emp_id = result.rows[0].tbs_pro_emp_id
-      console.log(`New Employee created with ID: ${tbs_pro_emp_id}`)
-      
-      const password = `EMP@${tbs_pro_emp_id}`
-      await pool.query(
-          `UPDATE pro_emp_personal_details SET password = $1 WHERE tbs_pro_emp_id = $2`,
-          [password, tbs_pro_emp_id]
-      )
-
-      await pool.query('COMMIT')
-
-      res.status(201).json({
-          message: 'Employee Created Successfully',
-          id: tbs_pro_emp_id,
-          password: password,
-          type_name: type_name,
-          type_id: type_id
-      })
-
-  } catch (err) {
-      await pool.query('ROLLBACK')
-      console.error('Error creating employee:', err.message)
-      res.status(500).json({ error: err.message })
-  }
-}
-
-
 
   //employee-peraonal-details PUT CONTROLLER
   const updateEMPpro = async (req, res) => {
@@ -189,7 +191,7 @@ const GETAllProfilepro = async (req, res) => {
       const result = await pool.query(`
       SELECT e.*, emp.*
       FROM pro_emp_personal_details AS e
-      LEFT JOIN pro_emp_professional_details AS emp ON e.tbs_pro_emp_id = emp.tbs_pro_emp_id
+      LEFT JOIN pro_emp_professional_details AS emp ON e.tbs_pro_emp_id = emp.tbs_pro_emp_id ORDER BY created_date DESC
   `)
       res.status(200).json(result.rows)
     } catch (err) {
@@ -876,108 +878,115 @@ const searchEmployeespro = async (req, res) => {
 }
 
 //employee excel import
-async function insertDatapro(req, res) {
-    const client = await pool.connect()
-    try {
-      const workbook = xlsx.readFile(req.file.path)
-      const sheet_name_list = workbook.SheetNames
-      const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]])
-  
-      // Convert Excel serial number to date
-      function excelSerialToDate(serial) {
-        const excelEpoch = moment('1899-12-30')
-        return excelEpoch.add(serial, 'days').format('YYYY-MM-DD')
-      }
-  
-      // Begin transaction
-      await client.query('BEGIN')
-  
-      for (const row of data) {
-        // Convert date_of_birth and joining_date if they are in Excel serial number format
-        if (!isNaN(row.date_of_birth)) {
-          row.date_of_birth = excelSerialToDate(row.date_of_birth)
-        }
-        if (!isNaN(row.joining_date)) {
-          row.joining_date = excelSerialToDate(row.joining_date)
-        }
-  
-        // Insert data into pro_emp_personal_details
-        const personalQuery = `
-          INSERT INTO pro_emp_personal_details (
-            emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, 
-            blood_group, temp_add, temp_country, temp_state, temp_city, temp_zip_code, 
-            perm_add, perm_country, perm_state, perm_city, perm_zip_code, type_name, 
-            type_id, password, emp_status, emp_status_id, token, profile_img
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-            $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
-          ) RETURNING tbs_pro_emp_id
-        `
-        const personalValues = [
-          row.emp_first_name, row.emp_last_name, row.phone, row.email_id, row.alternate_phone, row.date_of_birth, row.gender,
-          row.blood_group, row.temp_add, row.temp_country, row.temp_state, row.temp_city, row.temp_zip_code,
-          row.perm_add, row.perm_country, row.perm_state, row.perm_city, row.perm_zip_code, row.type_name,
-          row.type_id, row.password, row.emp_status, row.emp_status_id, row.token, row.profile_img
-        ]
-        const personalRes = await client.query(personalQuery, personalValues)
-        const employeeId = personalRes.rows[0].tbs_pro_emp_id
-  
-        // Check if employeeId already exists in pro_emp_professional_details
-        const checkQuery = 'SELECT 1 FROM pro_emp_professional_details WHERE tbs_pro_emp_id = $1'
-        const checkRes = await client.query(checkQuery, [employeeId])
-  
-        if (checkRes.rows.length === 0) {
-          // Insert data into pro_emp_professional_details if not exists
-          const professionalQuery = `
-            INSERT INTO pro_emp_professional_details (
-              tbs_pro_emp_id, joining_date, designation, branch, official_email_id, years_of_experience, 
-              department, reporting_manager, aadhar_card_number, aadhar_card_doc, pan_card_number, 
-              pan_card_doc, work_experience_certificate, educational_certificate, other_documents, 
-              role_type
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
-            )
-          `
-          const professionalValues = [
-            employeeId, row.joining_date, row.designation, row.branch, row.official_email_id,
-            row.years_of_experience, row.department, row.reporting_manager, row.aadhar_card_number,
-            row.aadhar_card_doc, row.pan_card_number, row.pan_card_doc, row.work_experience_certificate,
-            row.educational_certificate, row.other_documents, row.role_type
-          ]
-          await client.query(professionalQuery, professionalValues)
-        } else {
-          // Update existing data in pro_emp_professional_details
-          const updateQuery = `
-            UPDATE pro_emp_professional_details SET
-              joining_date = $2, designation = $3, branch = $4, official_email_id = $5, years_of_experience = $6, 
-              department = $7, reporting_manager = $8, aadhar_card_number = $9, aadhar_card_doc = $10, 
-              pan_card_number = $11, pan_card_doc = $12, work_experience_certificate = $13, 
-              educational_certificate = $14, other_documents = $15, role_type = $16
-            WHERE tbs_pro_emp_id = $1
-          `
-          const updateValues = [
-            employeeId, row.joining_date, row.designation, row.branch, row.official_email_id,
-            row.years_of_experience, row.department, row.reporting_manager, row.aadhar_card_number,
-            row.aadhar_card_doc, row.pan_card_number, row.pan_card_doc, row.work_experience_certificate,
-            row.educational_certificate, row.other_documents, row.role_type
-          ]
-          await client.query(updateQuery, updateValues)
-        }
-      }
-  
-      // Commit transaction
-      await client.query('COMMIT')
-      res.status(200).send('Data inserted/updated successfully')
-    } catch (err) {
-      // Rollback transaction in case of error
-      await client.query('ROLLBACK')
-      console.error('Error inserting data', err.stack)
-      res.status(201).send('Error inserting data')
-    } finally {
-      // Release the client back to the pool
-      client.release()
-    }
+const insertDatapro = async (req, res) => {
+  if (!req.file || !req.file.path) {
+      return res.status(400).send('No file uploaded.');
   }
+
+  try {
+      const workbook = xlsx.readFile(req.file.path);
+      const sheet_name_list = workbook.SheetNames;
+      const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
+
+      function excelSerialToDate(serial) {
+          const excelEpoch = moment('1899-12-30');
+          return excelEpoch.add(serial, 'days').format('YYYY-MM-DD');
+      }
+
+      const client = await pool.connect();
+
+      try {
+          await client.query('BEGIN');
+
+          for (const row of data) {
+              if (!isNaN(row.date_of_birth)) {
+                  row.date_of_birth = excelSerialToDate(row.date_of_birth);
+              }
+              if (!isNaN(row.joining_date)) {
+                  row.joining_date = excelSerialToDate(row.joining_date);
+              }
+
+              row.type_name = 'EMPLOYEE';
+              row.type_id = 'PROEMP101';
+              row.emp_status = 'active';
+              row.emp_status_id = 1;
+
+              const personalResult = await client.query(
+                  `INSERT INTO pro_emp_personal_details (
+                      emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, 
+                      blood_group, temp_add, temp_country, temp_state, temp_city, temp_zip_code, 
+                      perm_add, perm_country, perm_state, perm_city, perm_zip_code, type_name, 
+                      type_id, password, emp_status, emp_status_id
+                  ) VALUES (
+                      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
+                      $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+                  ) RETURNING tbs_pro_emp_id`,
+                  [
+                      row.emp_first_name, row.emp_last_name, row.phone, row.email_id, row.alternate_phone, row.date_of_birth, row.gender,
+                      row.blood_group, row.temp_add, row.temp_country, row.temp_state, row.temp_city, row.temp_zip_code,
+                      row.perm_add, row.perm_country, row.perm_state, row.perm_city, row.perm_zip_code, row.type_name,
+                      row.type_id, ' ', row.emp_status, row.emp_status_id
+                  ]
+              );
+
+              const employeeId = personalResult.rows[0].tbs_pro_emp_id;
+              const password = `EMP@${employeeId}`;
+
+              await client.query(
+                  `UPDATE pro_emp_personal_details
+                  SET password = $1
+                  WHERE tbs_pro_emp_id = $2`,
+                  [password, employeeId]
+              );
+
+              const checkResult = await client.query(
+                  'SELECT 1 FROM pro_emp_professional_details WHERE tbs_pro_emp_id = $1',
+                  [employeeId]
+              );
+
+              if (checkResult.rows.length === 0) {
+                  await client.query(
+                      `INSERT INTO pro_emp_professional_details (
+                          tbs_pro_emp_id, joining_date, designation, branch, official_email_id, years_of_experience, 
+                          department, reporting_manager, aadhar_card_number, pan_card_number, role_type
+                      ) VALUES (
+                          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+                      )`,
+                      [
+                          employeeId, row.joining_date, row.designation, row.branch, row.official_email_id,
+                          row.years_of_experience, row.department, row.reporting_manager, row.aadhar_card_number,
+                          row.pan_card_number, row.role_type
+                      ]
+                  );
+              } else {
+                  await client.query(
+                      `UPDATE pro_emp_professional_details SET
+                          joining_date = $2, designation = $3, branch = $4, official_email_id = $5, years_of_experience = $6, 
+                          department = $7, reporting_manager = $8, aadhar_card_number = $9,
+                          pan_card_number = $10, role_type = $11
+                      WHERE tbs_pro_emp_id = $1`,
+                      [
+                          employeeId, row.joining_date, row.designation, row.branch, row.official_email_id,
+                          row.years_of_experience, row.department, row.reporting_manager, row.aadhar_card_number, row.pan_card_number, row.role_type
+                      ]
+                  );
+              }
+          }
+
+          await client.query('COMMIT');
+          res.send('File processed and data uploaded successfully');
+      } catch (err) {
+          await client.query('ROLLBACK');
+          console.error('Error processing data', err.stack);
+          res.status(500).send('Error processing data');
+      } finally {
+          client.release();
+      }
+  } catch (error) {
+      console.error('Error uploading file:', error);
+      res.status(500).send('Error uploading file');
+  }
+}
 
   //STATUS UPDATION
   const updateEMPStatusPro = async (req, res) => {
@@ -1009,6 +1018,7 @@ async function insertDatapro(req, res) {
         console.error('Error updating employee status:', err.message);
         res.status(500).json({ error: 'Internal server error' });
     }
-};
+}
+
   
   module.exports = { createEMPpro, updateEMPpro, deleteEMPpro, getAllEMPpro, getEMPpro, emailValidationpro, Phonevalidationspro, updateEmployeeDetailspro, getAllEmployeespro, getEmployeeByIdpro, createDetailspro, fetchdatapro, fetchdataByIdpro, AddEmpDocpro, FetchAllDocspro, FetchDocpro, putEmployeepro, employeeLoginpro, searchEmployeespro, insertDatapro, getEMPByIDpro, FetchAllDocsOnlypro, FetchDoconlypro, updateEMPStatusPro, updateProfilepro,GETProfilepro, GETAllProfilepro }

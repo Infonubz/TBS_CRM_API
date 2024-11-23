@@ -1,5 +1,5 @@
 const express = require('express')
-const pool = require('../dbconnection.js')
+const pool = require('../config/db')
 const xlsx = require('xlsx')
 
 

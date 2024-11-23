@@ -1,5 +1,7 @@
 const pool = require('../config/db')
 const jwt = require('jsonwebtoken')
+const xlsx = require('xlsx');
+const moment = require('moment');
 
 // partner details POST CONTROLLER
 const createPartner = async (req, res) => {
@@ -282,43 +284,43 @@ const AddPartnerDoc = async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    const aadhar_card_file = req.files && req.files['aadhar_card_doc'] ? {
-      type: req.files['aadhar_card_doc'][0].mimetype,
-      filename: req.files['aadhar_card_doc'][0].filename,
-      path: req.files['aadhar_card_doc'][0].path,
-      size: req.files['aadhar_card_doc'][0].size,
+    const aadhar_front_file = req.files && req.files['aadhar_card_front'] ? {
+      type: req.files['aadhar_card_front'][0].mimetype,
+      filename: req.files['aadhar_card_front'][0].filename,
+      path: req.files['aadhar_card_front'][0].path,
+      size: req.files['aadhar_card_front'][0].size,
       created_date: new Date().toISOString()
   } : null
   
-  const pancard_file = req.files && req.files['pan_card_doc'] ? {
-      type: req.files['pan_card_doc'][0].mimetype,
-      filename: req.files['pan_card_doc'][0].filename,
-      path: req.files['pan_card_doc'][0].path,
-      size: req.files['pan_card_doc'][0].size,
+  const pancard_front_file = req.files && req.files['pan_card_front'] ? {
+      type: req.files['pan_card_front'][0].mimetype,
+      filename: req.files['pan_card_front'][0].filename,
+      path: req.files['pan_card_front'][0].path,
+      size: req.files['pan_card_front'][0].size,
       created_date: new Date().toISOString()
   } : null
   
-  const education_certificate_file =req.files && req.files['educational_certificate'] ? {
-      type: req.files['educational_certificate'][0].mimetype,
-      filename: req.files['educational_certificate'][0].filename,
-      path: req.files['educational_certificate'][0].path,
-      size: req.files['educational_certificate'][0].size,
+  const pancard_back_file =req.files && req.files['pan_card_back'] ? {
+      type: req.files['pan_card_back'][0].mimetype,
+      filename: req.files['pan_card_back'][0].filename,
+      path: req.files['pan_card_back'][0].path,
+      size: req.files['pan_card_back'][0].size,
       created_date: new Date().toISOString()
   } : null
   
-  const other_certificate_file = req.files && req.files['other_documents'] ? {
-      type: req.files['other_documents'][0].mimetype,
-      filename: req.files['other_documents'][0].filename,
-      path: req.files['other_documents'][0].path,
-      size: req.files['other_documents'][0].size,
+  const aadhar_back_file = req.files && req.files['aadhar_card_back'] ? {
+      type: req.files['aadhar_card_back'][0].mimetype,
+      filename: req.files['aadhar_card_back'][0].filename,
+      path: req.files['aadhar_card_back'][0].path,
+      size: req.files['aadhar_card_back'][0].size,
       created_date: new Date().toISOString()
   } : null
   
     
-    const aadhar_card_doc = req.files && req.files['aadhar_card_doc'] ? `/partner_files/${req.files['aadhar_card_doc'][0].filename}` : null
-    const pan_card_doc = req.files && req.files['pan_card_doc'] ? `/partner_files/${req.files['pan_card_doc'][0].filename}` : null
-    const educational_certificate = req.files && req.files['educational_certificate'] ? `/partner_files/${req.files['educational_certificate'][0].filename}` : null
-    const other_documents = req.files && req.files['other_documents'] ? `/partner_files/${req.files['other_documents'][0].filename}` : null
+    const aadhar_card_front = req.files && req.files['aadhar_card_front'] ? `/partner_files/${req.files['aadhar_card_front'][0].filename}` : null
+    const pan_card_front = req.files && req.files['pan_card_front'] ? `/partner_files/${req.files['pan_card_front'][0].filename}` : null
+    const pan_card_back = req.files && req.files['pan_card_back'] ? `/partner_files/${req.files['pan_card_back'][0].filename}` : null
+    const aadhar_card_back = req.files && req.files['aadhar_card_back'] ? `/partner_files/${req.files['aadhar_card_back'][0].filename}` : null
 
     try {
       await pool.query('BEGIN')
@@ -327,23 +329,23 @@ const AddPartnerDoc = async (req, res) => {
       UPDATE partner_documents
       SET 
           aadhar_card_number = COALESCE($1, aadhar_card_number),
-          aadhar_card_doc = COALESCE($2, aadhar_card_doc),
+          aadhar_card_front = COALESCE($2, aadhar_card_front),
           pan_card_number = COALESCE($3, pan_card_number),
-          pan_card_doc = COALESCE($4, pan_card_doc),
-          educational_certificate = COALESCE($5, educational_certificate),
-          other_documents = COALESCE($6, other_documents),
-          aadhar_card_file = COALESCE($7, aadhar_card_file),
-          pancard_file = COALESCE($8, pancard_file),
-          education_certificate_file = COALESCE($9, education_certificate_file),
-          other_certificate_file = COALESCE($10, other_certificate_file),
+          pan_card_front = COALESCE($4, pan_card_front),
+          pan_card_back = COALESCE($5, pan_card_back),
+          aadhar_card_back = COALESCE($6, aadhar_card_back),
+          aadhar_front_file = COALESCE($7, aadhar_front_file),
+          pancard_front_file = COALESCE($8, pancard_front_file),
+          pancard_back_file = COALESCE($9, pancard_back_file),
+          aadhar_back_file = COALESCE($10, aadhar_back_file),
           updated_date = now()
       WHERE tbs_partner_id = $11
       RETURNING *;      
       `;
       const updateDocumentsValues = [
-          aadhar_card_number, aadhar_card_doc, pan_card_number, pan_card_doc,
-          educational_certificate, other_documents, aadhar_card_file, pancard_file,
-          education_certificate_file, other_certificate_file, tbs_partner_id
+          aadhar_card_number, aadhar_card_front, pan_card_number, pan_card_front,
+          pan_card_back, aadhar_card_back, aadhar_front_file, pancard_front_file,
+          pancard_back_file, aadhar_back_file, tbs_partner_id
       ];
 
       await pool.query(updateDocumentsQuery, updateDocumentsValues);
@@ -371,8 +373,8 @@ const AddPartnerDoc = async (req, res) => {
 // partner documents GET CONTROLLER
 const FetchAllDocuments = async (req, res) => {
     const query = `SELECT 
-                        tbs_partner_id, aadhar_card_number, aadhar_card_doc,
-                        pan_card_number, pan_card_doc,educational_certificate, other_documents 
+                        tbs_partner_id, aadhar_card_number, aadhar_card_front,
+                        pan_card_number, pan_card_front,pan_card_back, aadhar_card_back 
                   FROM partner_documents`
 
     try {
@@ -388,8 +390,8 @@ const FetchAllDocuments = async (req, res) => {
 const FetchDocumentByID = async (req, res) => {
     const tbs_partner_id  = req.params.tbs_partner_id
 
-    const query = `SELECT tbs_partner_id, aadhar_card_number, aadhar_card_doc,
-    pan_card_number, pan_card_doc,educational_certificate, other_documents 
+    const query = `SELECT tbs_partner_id, aadhar_card_number, aadhar_card_front,
+    pan_card_number, pan_card_front,pan_card_back, aadhar_card_back 
     FROM partner_documents WHERE tbs_partner_id = $1`
 
     try {
@@ -407,8 +409,8 @@ const FetchDocumentByID = async (req, res) => {
 // partner documents GET CONTROLLER
 const FetchAllDocumentDetails = async (req, res) => {
   const query = `SELECT 
-                      tbs_partner_id, aadhar_card_number, aadhar_card_doc, aadhar_card_file,
-                      pan_card_number, pan_card_doc, pancard_file, educational_certificate, education_certificate_file, other_documents, other_certificate_file
+                      tbs_partner_id, aadhar_card_number, aadhar_card_front, aadhar_front_file,
+                      pan_card_number, pan_card_front, pancard_front_file, pan_card_back, pancard_back_file, aadhar_card_back, aadhar_back_file
                 FROM partner_documents`
 
   try {
@@ -424,8 +426,8 @@ const FetchAllDocumentDetails = async (req, res) => {
 const FetchDocumentDetailsByID = async (req, res) => {
   const tbs_partner_id  = req.params.tbs_partner_id
 
-  const query = `SELECT tbs_partner_id, aadhar_card_number, aadhar_card_doc, aadhar_card_file,
-  pan_card_number, pan_card_doc, pancard_file, educational_certificate, education_certificate_file, other_documents, other_certificate_file
+  const query = `SELECT tbs_partner_id, aadhar_card_number, aadhar_card_front, aadhar_front_file,
+  pan_card_number, pan_card_front, pancard_front_file, pan_card_back, pancard_back_file, aadhar_card_back, aadhar_back_file
   FROM partner_documents WHERE tbs_partner_id = $1`
 
   try {
@@ -583,5 +585,92 @@ const partnerLogin = async (req, res) => {
   }
 }
 
+//excel import
+const importPartnerDetails = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const workbook = xlsx.readFile(req.file.path);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+  const excelData = xlsx.utils.sheet_to_json(worksheet);
+
+  try {
+    await pool.query('BEGIN');
+
+    for (const row of excelData) {
+      const {
+        partner_first_name, partner_last_name, phone, emailid,
+        alternate_phone, date_of_birth, gender,
+        temp_add, temp_country, temp_state, temp_city, temp_zip_code,
+        perm_add, perm_country, perm_state, perm_city, perm_zip_code,
+        type_name = 'PARTNER',
+        type_id = 'PART101',
+        partner_status = 'draft',
+        partner_status_id = 0,
+        req_status = null,
+        req_status_id = null,
+      } = row;
+
+      if (!partner_first_name || !partner_last_name || !phone || !emailid || !date_of_birth || !gender) {
+        return res.status(400).json({ error: 'Missing required fields in Excel data' });
+      }
+
+      const formattedDOB = moment(date_of_birth, ['MM-DD-YYYY', 'DD-MM-YYYY', 'YYYY-MM-DD']).format('YYYY-MM-DD');
+      if (!formattedDOB || formattedDOB === 'Invalid date') {
+        return res.status(400).json({ error: 'Invalid date format in Excel data' });
+      }
+
+      const result = await pool.query(
+        `INSERT INTO partner_details (
+          partner_first_name, partner_last_name, phone, emailid, alternate_phone,
+          date_of_birth, gender, type_name, type_id, partner_status,
+          partner_status_id, req_status, req_status_id, temp_add, temp_country,
+          temp_state, temp_city, temp_zip_code, perm_add, perm_country,
+          perm_state, perm_city, perm_zip_code
+        ) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        RETURNING tbs_partner_id;`,
+        [
+          partner_first_name, partner_last_name, phone, emailid, alternate_phone,
+          formattedDOB, gender, type_name, type_id, partner_status, partner_status_id,
+          req_status, req_status_id, temp_add, temp_country, temp_state, temp_city, temp_zip_code,
+          perm_add, perm_country, perm_state, perm_city, perm_zip_code
+        ]
+      );
+
+      const tbs_partner_id = result.rows[0].tbs_partner_id;
+      const password = `PAT@${tbs_partner_id}`;
+
+      await pool.query(
+        `UPDATE partner_details SET password = $1 WHERE tbs_partner_id = $2`,
+        [password, tbs_partner_id]
+      );
+
+      // Assuming the aadhar_card_number and pan_card_number are part of the Excel row
+      const { aadhar_card_number, pan_card_number } = row;
+
+      const documentInsertQuery = `
+        UPDATE partner_documents
+        SET aadhar_card_number = $2, pan_card_number = $3
+        WHERE tbs_partner_id = $1;
+      `;
+      const documentInsertValues = [tbs_partner_id, aadhar_card_number, pan_card_number];
+
+      await pool.query(documentInsertQuery, documentInsertValues);
+
+      console.log(`Partner with ID ${tbs_partner_id} imported successfully`);
+    }
+
+    await pool.query('COMMIT');
+    res.status(201).json({ message: 'Partner details imported successfully' });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error('Error inserting into database:', err);
+    res.status(500).json({ error: 'Database insertion failed' });
+  }
+};
+
   
-  module.exports = { createPartner, updatePartner, deletePartner, getPartnerByID, getPartner, Emailval, phoneVal, AddPartnerDoc, FetchAllDocuments, FetchDocumentByID, updatePartnerDetails, getAllPartners, getPartnerAddressById, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, updatePartnerProfile, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus }
+  module.exports = { createPartner, updatePartner, deletePartner, getPartnerByID, getPartner, Emailval, phoneVal, AddPartnerDoc, FetchAllDocuments, FetchDocumentByID, updatePartnerDetails, getAllPartners, getPartnerAddressById, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, updatePartnerProfile, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, importPartnerDetails }
