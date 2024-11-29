@@ -354,14 +354,14 @@ const ImportExcel = async (req, res) => {
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
 
         for (let i = 0; i < data.length; i++) {
-            let { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id } = data[i];
+            let { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id } = data[i];
 
             start_date = excelDateToJSDate(start_date);
             expiry_date = excelDateToJSDate(expiry_date);
 
             const query = {
-                text: `INSERT INTO redeem_offers (tbs_user_id,offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-                values: [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id],
+                text: `INSERT INTO redeem_offers (tbs_user_id,offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+                values: [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id],
             };
 
             await pool.query(query);

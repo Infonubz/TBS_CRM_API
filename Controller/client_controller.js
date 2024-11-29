@@ -334,7 +334,7 @@ const putClientGst = async (req, res) => {
 
         const clientCompanyQuery = `
             UPDATE client_company_details
-            SET status = 'Active', status_id = 2
+            SET status = 'Active', status_id = 1
             WHERE tbs_client_id = $1
         `
 

@@ -108,14 +108,14 @@ const getRoleMemberCountOpEmp = async (req, res) => {
 
     const query = `
     WITH selected_roles AS (
-        SELECT DISTINCT role_type
+        SELECT DISTINCT role_type, role_id
         FROM public.active_permissions_tbl
         WHERE tbs_user_id = $1
     ),
     employee_roles AS (
         SELECT 
             r.tbs_op_emp_id,
-            r.role_type
+            r.role_type, r.role_type_id
         FROM 
             public.op_emp_professional_details r
         JOIN 
@@ -126,6 +126,9 @@ const getRoleMemberCountOpEmp = async (req, res) => {
             selected_roles sr 
         ON 
             r.role_type = sr.role_type
+        WHERE
+            p.emp_status = 'Active'
+            AND p.emp_status_id = 1
     ),
     permission_counts AS (
         SELECT
@@ -141,6 +144,7 @@ const getRoleMemberCountOpEmp = async (req, res) => {
     )
     SELECT 
         sr.role_type,
+        sr.role_id,
         COALESCE(COUNT(DISTINCT er.tbs_op_emp_id), 0) AS role_count,
         COALESCE(pc.permission_access_count, 0) AS permission_access_count
     FROM 
@@ -150,7 +154,7 @@ const getRoleMemberCountOpEmp = async (req, res) => {
     LEFT JOIN 
         permission_counts pc ON sr.role_type = pc.role_type
     GROUP BY 
-        sr.role_type, pc.permission_access_count
+        sr.role_type, sr.role_id, pc.permission_access_count
     ORDER BY 
         sr.role_type;`;
 
@@ -159,19 +163,35 @@ const getRoleMemberCountOpEmp = async (req, res) => {
         const result = await pool.query(query, params);
 
         if (result.rows.length === 0) {
-            res.status(202).json({ message: 'No data found for this user or role' });
-        } else {
-            res.json(result.rows);
+            return res.status(202).json({ message: 'No data found for this user or role' });
         }
+
+        const updatePromises = result.rows.map(async (row) => {
+            const updateQuery = `
+                UPDATE public.active_roles_tbl
+                SET role_member_count = $1
+                WHERE role_type = $2 AND role_id = $3 `;
+            const updateParams = [row.role_count, row.role_type, row.role_id];
+            await pool.query(updateQuery, updateParams);
+        });
+
+        await Promise.all(updatePromises);
+
+        res.json(result.rows);
     } catch (err) {
         console.error('Error executing query', err.stack);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }
 
+
 //GET ROLE MEMBER COUNT - PERMISSION FROM PRO-EMP TABLE
 const getRoleMemberCountProEmp = async (req, res) => {
-    const { role } = req.body; 
+    const { role } = req.body;
+
+    if (!role) {
+        return res.status(400).json({ error: 'Role is required' });
+    }
 
     let query;
 
@@ -179,12 +199,20 @@ const getRoleMemberCountProEmp = async (req, res) => {
         query = `
         WITH role_counts AS (
             SELECT 
-                role_type AS role,
+                p.role_type AS role,
+                p.role_type_id,
                 COUNT(*) AS role_count
             FROM 
-                public.pro_emp_professional_details
+                public.pro_emp_professional_details p
+            JOIN 
+                public.pro_emp_personal_details pr
+            ON 
+                p.tbs_pro_emp_id = pr.tbs_pro_emp_id
+            WHERE 
+                pr.emp_status = 'Active' 
+                AND pr.emp_status_id = 1
             GROUP BY 
-                role_type
+                p.role_type, p.role_type_id
         ),
         expanded_permissions AS (
             SELECT 
@@ -205,7 +233,8 @@ const getRoleMemberCountProEmp = async (req, res) => {
         permission_counts AS (
             SELECT
                 e.role_type AS role,
-                COALESCE(d.permission_access_count, 0) AS permission_access_count
+                COALESCE(d.permission_access_count, 0) AS permission_access_count,
+                e.role_type_id 
             FROM 
                 public.pro_emp_professional_details e
             LEFT JOIN 
@@ -213,13 +242,14 @@ const getRoleMemberCountProEmp = async (req, res) => {
             ON 
                 e.role_type_id = d.role_id
             GROUP BY
-                e.role_type, d.permission_access_count
+                e.role_type, e.role_type_id, d.permission_access_count
         )
         SELECT 
             'product owner-employee' AS "user",
             r.role,
             r.role_count,
-            COALESCE(p.permission_access_count, 0) AS permission_access_count
+            COALESCE(p.permission_access_count, 0) AS permission_access_count,
+            r.role_type_id 
         FROM 
             role_counts r
         LEFT JOIN 
@@ -228,16 +258,18 @@ const getRoleMemberCountProEmp = async (req, res) => {
             r.role = p.role
         ORDER BY 
             r.role;`;
+
     } else if (role === 'OP') {
         query = `
         WITH selected_roles AS (
-            SELECT DISTINCT role_type
+            SELECT DISTINCT role_type, role_id
             FROM public.active_permissions_tbl
         ),
         employee_roles AS (
             SELECT 
                 r.tbs_op_emp_id,
-                r.role_type
+                r.role_type, 
+                r.role_type_id
             FROM 
                 public.op_emp_professional_details r
             JOIN 
@@ -248,6 +280,9 @@ const getRoleMemberCountProEmp = async (req, res) => {
                 selected_roles sr 
             ON 
                 r.role_type = sr.role_type
+            WHERE
+                p.emp_status = 'Active' 
+                AND p.emp_status_id = 1
         ),
         permission_counts AS (
             SELECT
@@ -260,10 +295,11 @@ const getRoleMemberCountProEmp = async (req, res) => {
                 role_type
         )
         SELECT 
-            'operator-employee' AS "user",   -- Changed to reflect the operator employee
+            'operator-employee' AS "user",
             sr.role_type AS role,
             COALESCE(COUNT(DISTINCT er.tbs_op_emp_id), 0) AS role_count,
-            COALESCE(pc.permission_access_count, 0) AS permission_access_count
+            COALESCE(pc.permission_access_count, 0) AS permission_access_count,
+            sr.role_id 
         FROM 
             selected_roles sr
         LEFT JOIN 
@@ -271,10 +307,9 @@ const getRoleMemberCountProEmp = async (req, res) => {
         LEFT JOIN 
             permission_counts pc ON sr.role_type = pc.role_type
         GROUP BY 
-            sr.role_type, pc.permission_access_count
+            sr.role_type, sr.role_id, pc.permission_access_count
         ORDER BY 
-            sr.role_type;
-        `;
+            sr.role_type;`;
     } else {
         return res.status(400).json({ error: 'Invalid role type passed' });
     }
@@ -283,10 +318,23 @@ const getRoleMemberCountProEmp = async (req, res) => {
         const result = await pool.query(query);  
 
         if (result.rows.length === 0) {
-            res.status(202).json({ message: 'No data found for the given role or user' });
-        } else {
-            res.json(result.rows);
+            return res.status(202).json({ message: 'No data found for the given role or user' });
         }
+
+        const updatePromises = result.rows.map(async (row) => {
+            const updateQuery = `
+                UPDATE public.active_roles_tbl
+                SET role_member_count = $1
+                WHERE role_type = $2 AND role_id = $3
+            `;
+            const updateParams = [row.role_count, row.role, row.role_id];
+            await pool.query(updateQuery, updateParams);
+        });
+
+        await Promise.all(updatePromises);
+
+        res.json(result.rows);
+
     } catch (err) {
         console.error('Error executing query', err.stack);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -334,12 +382,20 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         query = `
         WITH role_counts AS (
             SELECT 
-                role_type AS role,
+                p.role_type AS role,
+                p.role_type_id,
                 COUNT(*) AS role_count
             FROM 
-                public.pro_emp_professional_details
+                public.pro_emp_professional_details p
+            JOIN 
+                public.pro_emp_personal_details pr
+            ON 
+                p.tbs_pro_emp_id = pr.tbs_pro_emp_id
+            WHERE 
+                pr.emp_status = 'Active'  -- Only active employees
+                AND pr.emp_status_id = 1
             GROUP BY 
-                role_type
+                p.role_type, p.role_type_id
         ),
         expanded_permissions AS (
             SELECT 
@@ -382,9 +438,9 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         ON 
             r.role = p.role
         WHERE 
-            LOWER(r.role) LIKE LOWER($1)  
+            LOWER(r.role) LIKE LOWER($1)  -- Apply search filter
         ORDER BY 
-            r.role; `;
+            r.role;`;
     } else if (role === 'OP') {
         query = `
         WITH selected_roles AS (
@@ -405,6 +461,8 @@ const searchRoleMemberCountProEmp = async (req, res) => {
                 selected_roles sr 
             ON 
                 r.role_type = sr.role_type
+            WHERE
+                p.emp_status = 'Active' AND p.emp_status_id = 1  
         ),
         permission_counts AS (
             SELECT
@@ -428,11 +486,11 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         LEFT JOIN 
             permission_counts pc ON sr.role_type = pc.role_type
         WHERE 
-            LOWER(sr.role_type) LIKE LOWER($1)
+            LOWER(sr.role_type) LIKE LOWER($1)  -- Apply search filter
         GROUP BY 
             sr.role_type, pc.permission_access_count
         ORDER BY 
-            sr.role_type; `;
+            sr.role_type;`;
     }
 
     const searchValue = `%${searchTerm || ''}%`;
@@ -441,10 +499,9 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         const result = await pool.query(query, [searchValue]);
 
         if (result.rows.length === 0) {
-            res.status(202).json({ message: 'No data found for the given search criteria' });
-        } else {
-            res.json(result.rows);
+            return res.status(202).json({ message: 'No data found for the given search criteria' });
         }
+        res.json(result.rows);
     } catch (err) {
         console.error('Error executing query', err.stack);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -496,6 +553,8 @@ const getRoleMemberCountOpEmpSearch = async (req, res) => {
             r.role_type = sr.role_type
         WHERE
             LOWER(r.role_type) LIKE LOWER($2)  
+            AND p.emp_status = 'Active'
+            AND p.emp_status_id = 1
     ),
     permission_counts AS (
         SELECT
@@ -525,7 +584,7 @@ const getRoleMemberCountOpEmpSearch = async (req, res) => {
     GROUP BY 
         sr.role_type, pc.permission_access_count
     ORDER BY 
-        sr.role_type; `;
+        sr.role_type;`;
 
     try {
         const params = [tbs_user_id, `%${searchTerm}%`];
