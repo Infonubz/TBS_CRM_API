@@ -8,7 +8,7 @@ const postOffer = async (req, res) => {
     const {
         tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, 
         status_id, offer_desc, occupation, req_status, req_status_id, 
-        occupation_id, offer_value
+        occupation_id, offer_value, value_symbol
     } = req.body;
 
     const offerPicUrl = req.files && req.files['offer_img'] ? `/offer_files/${req.files['offer_img'][0].filename}` : null;
@@ -93,13 +93,13 @@ const postOffer = async (req, res) => {
                 req_status, 
                 req_status_id, 
                 occupation_id, 
-                offer_value
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+                offer_value, value_symbol
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) 
             RETURNING tbs_offer_id`,
             [
                 tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, 
                 offerPicUrl, image_file?.size, image_file?.type, image_file, themeUrl, occupation, req_status, 
-                req_status_id, occupation_id, offer_value
+                req_status_id, occupation_id, offer_value, value_symbol
             ]
         );
 
@@ -157,38 +157,101 @@ const postOffer = async (req, res) => {
 
 const updateOffer = async (req, res) => {
     const tbs_offer_id = req.params.tbs_offer_id;
-    const { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id, offer_value } = req.body;
+    const {
+        tbs_user_id,
+        offer_name,
+        code,
+        start_date,
+        expiry_date,
+        usage,
+        status,
+        status_id,
+        offer_desc,
+        occupation,
+        occupation_id,
+        req_status,
+        req_status_id,
+        offer_value,
+        value_symbol,
+    } = req.body;
 
     const offerPicUrl = req.files['offer_img'] ? `/offer_files/${req.files['offer_img'][0].filename}` : null;
     const themeUrl = req.files['theme'] ? `/offer_files/${req.files['theme'][0].filename}` : null;
     const image_size = req.files['offer_img'] ? req.files['offer_img'][0].size : null;
     const image_type = req.files['offer_img'] ? req.files['offer_img'][0].mimetype : null;
 
-    const image_file = req.files['offer_img'] ? {
-        fieldname: req.files['offer_img'][0].fieldname,
-        originalname: req.files['offer_img'][0].originalname,
-        encoding: req.files['offer_img'][0].encoding,
-        type: req.files['offer_img'][0].mimetype,
-        destination: req.files['offer_img'][0].destination,
-        filename: req.files['offer_img'][0].filename,
-        path: req.files['offer_img'][0].path,
-        size: req.files['offer_img'][0].size
-    } : null;
+    const image_file = req.files['offer_img']
+        ? {
+              fieldname: req.files['offer_img'][0].fieldname,
+              originalname: req.files['offer_img'][0].originalname,
+              encoding: req.files['offer_img'][0].encoding,
+              type: req.files['offer_img'][0].mimetype,
+              destination: req.files['offer_img'][0].destination,
+              filename: req.files['offer_img'][0].filename,
+              path: req.files['offer_img'][0].path,
+              size: req.files['offer_img'][0].size,
+          }
+        : null;
 
     try {
         if (!tbs_offer_id) return res.status(400).json({ error: 'Offer ID is required' });
 
         const offerExists = await pool.query('SELECT * FROM discount_offers WHERE tbs_offer_id = $1', [tbs_offer_id]);
-        if (offerExists.rows.length === 0) return res.status(201).json({ error: 'Offer not found' });
+        if (offerExists.rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
+
+        const statusIdValue = status_id ? parseInt(status_id, 10) : null;
+        const reqStatusIdValue = req_status_id ? parseInt(req_status_id, 10) : null;
 
         const result = await pool.query(
             `UPDATE discount_offers SET 
-                tbs_user_id = COALESCE($1, tbs_user_id), offer_name = COALESCE($2, offer_name), code = COALESCE($3, code), start_date = COALESCE($4, start_date), expiry_date = COALESCE($5, expiry_date), usage = COALESCE($6, usage), status = COALESCE($7, status), status_id = COALESCE($8, status_id), offer_desc = COALESCE($9, offer_desc), offer_img = COALESCE($10, offer_img), image_size = COALESCE($11, image_size), image_type = COALESCE($12, image_type), image_file = COALESCE($13, image_file), occupation = COALESCE($14, occupation), theme = COALESCE($15, theme), occupation_id = COALESCE($16, occupation_id), req_status = COALESCE($17, req_status), req_status_id = COALESCE($18, req_status_id), offer_value = COALESCE($19, offer_value), updated_date = now() 
-            WHERE tbs_offer_id = $20 RETURNING *`,
-            [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, offerPicUrl, image_size, image_type, image_file, occupation, themeUrl, occupation_id, req_status, req_status_id, offer_value, tbs_offer_id]
+                tbs_user_id = COALESCE($1, tbs_user_id), 
+                offer_name = COALESCE($2, offer_name), 
+                code = COALESCE($3, code), 
+                start_date = COALESCE($4, start_date), 
+                expiry_date = COALESCE($5, expiry_date), 
+                usage = COALESCE($6, usage), 
+                status = COALESCE($7, status), 
+                status_id = COALESCE($8::INTEGER, status_id), 
+                offer_desc = COALESCE($9, offer_desc), 
+                offer_img = COALESCE($10, offer_img), 
+                image_size = COALESCE($11, image_size), 
+                image_type = COALESCE($12, image_type), 
+                image_file = COALESCE($13, image_file), 
+                occupation = COALESCE($14, occupation), 
+                theme = COALESCE($15, theme), 
+                occupation_id = COALESCE($16, occupation_id), 
+                req_status = COALESCE($17, req_status), 
+                req_status_id = COALESCE($18::INTEGER, req_status_id), 
+                offer_value = COALESCE($19, offer_value), 
+                updated_date = now(), 
+                value_symbol = COALESCE($20, value_symbol)  
+            WHERE tbs_offer_id = $21 RETURNING *`,
+            [
+                tbs_user_id,
+                offer_name,
+                code,
+                start_date,
+                expiry_date,
+                usage,
+                status,
+                statusIdValue, 
+                offer_desc,
+                offerPicUrl,
+                image_size,
+                image_type,
+                image_file,
+                occupation,
+                themeUrl,
+                occupation_id,
+                req_status,
+                reqStatusIdValue, 
+                offer_value,
+                value_symbol,
+                tbs_offer_id,
+            ]
         );
 
-        res.status(200).json({ message: 'Offer updated successfully' });
+        res.status(200).json({ message: 'Offer updated successfully', data: result.rows[0] });
     } catch (err) {
         console.error('Error updating offer:', err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -238,7 +301,8 @@ const deleteoffers = async (req, res) => {
             req_status: offer.req_status,
             req_status_id: offer.req_status_id,
             occupation_id: offer.occupation_id,
-            offer_value: offer.offer_value
+            offer_value: offer.offer_value,
+            value_symbol: offer.value_symbol
         };
 
         const recycleQuery = `
@@ -375,14 +439,14 @@ const ImportExcel = async (req, res) => {
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
 
         for (let i = 0; i < data.length; i++) {
-            let { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id } = data[i];
+            let { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id, value_symbol } = data[i];
 
             start_date = excelDateToJSDate(start_date);
             expiry_date = excelDateToJSDate(expiry_date);
 
             const query = {
-                text: `INSERT INTO discount_offers (tbs_user_id,offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-                values: [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id],
+                text: `INSERT INTO discount_offers (tbs_user_id,offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id, value_symbol) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING *`,
+                values: [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, offer_value, req_status, req_status_id, value_symbol]
             };
 
             await pool.query(query);

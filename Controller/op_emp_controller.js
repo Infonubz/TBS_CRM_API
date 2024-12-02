@@ -223,6 +223,21 @@ const getAllEMPop = async (req, res) => {
     }
   }
 
+  //employee-peraonal-details GET CONTROLLER
+const getAllOPEMPbyOPid = async (req, res) => {
+ const { tbs_operator_id } = req.params
+    try {
+      const result = await pool.query(`
+      SELECT e.*, emp.*
+      FROM op_emp_personal_details AS e
+      LEFT JOIN op_emp_professional_details AS emp ON e.tbs_op_emp_id = emp.tbs_op_emp_id WHERE tbs_operator_id = $1 ORDER BY created_date DESC 
+  `, [tbs_operator_id])
+      res.status(200).json(result.rows)
+    } catch (err) {
+      res.status(200).json({ error: err.message })
+    }
+  }
+
   //employee-peraonal-details GETbyID CONTROLLER
   const getEMP = async (req, res) => {
     try {
@@ -1168,4 +1183,4 @@ async function insertData(req, res) {
 };
 
   
-  module.exports = { createEMP, updateEMP, deleteEMP, getAllEMPop, getEMP, emailValidation, Phonevalidations, updateEmployeeDetails, getAllEmployees, getEmployeeById, createDetails, fetchdata, fetchdataById, AddEmpDoc, FetchAllDocs, FetchDoc, putEmployee, employeeLogin, searchEmployees, insertData, getEMPByID, FetchAllDocsOnly, FetchDoconly, updateEMPStatus, updateProfile, GETProfileById, GETAllProfile }
+  module.exports = { createEMP, updateEMP, deleteEMP, getAllEMPop, getEMP, emailValidation, Phonevalidations, updateEmployeeDetails, getAllEmployees, getEmployeeById, createDetails, fetchdata, fetchdataById, AddEmpDoc, FetchAllDocs, FetchDoc, putEmployee, employeeLogin, searchEmployees, insertData, getEMPByID, FetchAllDocsOnly, FetchDoconly, updateEMPStatus, updateProfile, GETProfileById, GETAllProfile, getAllOPEMPbyOPid }

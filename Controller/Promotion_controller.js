@@ -212,7 +212,7 @@ const deletePromo = async (req, res) => {
  
 //POST PROMOTION
 const postPromo = async (req, res) => {
-    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, tbs_user_id, promo_value, promo_code } = req.body;
+    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, tbs_user_id, promo_value, promo_code, value_symbol } = req.body;
 
     if (req.file) {
         if (req.file.size > 5 * 1024 * 1024) {
@@ -281,8 +281,8 @@ const postPromo = async (req, res) => {
         }
 
         const insertPromo = `
-            INSERT INTO promotions_tbl (promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, promo_image, tbs_user_id, background_image, promo_img_details, promo_value, promo_code)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            INSERT INTO promotions_tbl (promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, promo_image, tbs_user_id, background_image, promo_img_details, promo_value, promo_code, value_symbol)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING promo_id
         `;
         const values = [
@@ -299,7 +299,7 @@ const postPromo = async (req, res) => {
             promoImgDetails.promo_image.path, 
             tbs_user_id, 
             promoImgDetails.background_image.path,
-            promoImgDetails, promo_value, promo_code
+            promoImgDetails, promo_value, promo_code, value_symbol
         ];
 
         const promoResult = await client.query(insertPromo, values);
@@ -358,7 +358,7 @@ const postPromo = async (req, res) => {
 //UPDATE PROMOTION BY ID
 const putPromo = async (req, res) => {
     const ID = req.params.promo_id
-    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, tbs_user_id, promo_value, promo_code } = req.body
+    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, tbs_user_id, promo_value, promo_code, value_symbol } = req.body
  
     if (req.file && req.file.size > 5 * 1024 * 1024) {
         return res.status(400).send('File size exceeded (Max: 5MB)')
@@ -382,12 +382,12 @@ const putPromo = async (req, res) => {
         tbs_user_id = $11,
         promo_value = $12,
         promo_code = $13,
-        updated_date = NOW()  
-    WHERE promo_id = $14
+        updated_date = NOW(), value_symbol = $14  
+    WHERE promo_id = $15
     RETURNING *
 `;
 
-    const values = [promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, uploadPromoUrl, uploadPromobackImage, promo_value, promo_code, tbs_user_id, ID]
+    const values = [promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, uploadPromoUrl, uploadPromobackImage, tbs_user_id, promo_value, promo_code, value_symbol, ID]
  
     try {
         const result = await pool.query(updatePromo, values)
@@ -618,7 +618,7 @@ const promoFilterByDate = async (req, res) => {
             }
     
             for (let i = 0; i < data.length; i++) {
-                let { promo_name, operator_details, start_date, expiry_date, usage, promo_description } = data[i];
+                let { promo_name, operator_details, start_date, expiry_date, usage, promo_description, promo_value, value_symbol } = data[i];
     
                 if (!validateRow(data[i])) {
                     return res.status(400).send(`Row with missing or invalid data: ${JSON.stringify(data[i])}`);
@@ -629,9 +629,9 @@ const promoFilterByDate = async (req, res) => {
     
                 const query = {
                     text: `INSERT INTO promotions_tbl (
-                        promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, tbs_user_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-                    values: [promo_name, operator_details, start_date, expiry_date, usage, '0', 'pending', promo_description, tbs_user_id],
+                        promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, promo_value, value_symbol, tbs_user_id
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+                    values: [promo_name, operator_details, start_date, expiry_date, usage, '0', 'pending', promo_description, promo_value, value_symbol, tbs_user_id],
                 };
     
                 await pool.query(query);

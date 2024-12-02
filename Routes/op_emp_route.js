@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const { createEMP, updateEMP, deleteEMP, getEMP, getAllEMP, emailValidation, Phonevalidations, getAllEmployees, getEmployeeById, updateEmployeeDetails, putEmployee, createDetails, fetchdataById, fetchdata, AddEmpDoc, FetchDoc, FetchAllDocs, employeeLogin, searchEmployees, insertData, getEMPByID, FetchDoconly, FetchAllDocsOnly, updateEMPStatus, getAllEMPop, updateProfile, GETAllProfile, GETProfileById } = require('../Controller/op_emp_controller');
+const { createEMP, updateEMP, deleteEMP, getEMP, getAllEMP, emailValidation, Phonevalidations, getAllEmployees, getEmployeeById, updateEmployeeDetails, putEmployee, createDetails, fetchdataById, fetchdata, AddEmpDoc, FetchDoc, FetchAllDocs, employeeLogin, searchEmployees, insertData, getEMPByID, FetchDoconly, FetchAllDocsOnly, updateEMPStatus, getAllEMPop, updateProfile, GETAllProfile, GETProfileById, getAllOPEMPbyOPid } = require('../Controller/op_emp_controller');
 
 const emprouter = express.Router()
 
@@ -57,6 +57,7 @@ emprouter.delete('/emp-personal-details/:tbs_op_emp_id', deleteEMP)
 emprouter.get('/emp-personal-details', getEMP)
 emprouter.get('/emp-personal-details/:tbs_op_emp_id', getEMPByID)
 emprouter.get('/All-emp-details', getAllEMPop)
+emprouter.get('/All-emp-details/:tbs_operator_id', getAllOPEMPbyOPid)
 emprouter.post('/employee_email-validation', emailValidation)
 emprouter.post('/employee_Phone-validation', Phonevalidations)
 emprouter.post('/employee-login', employeeLogin)

@@ -282,8 +282,8 @@ const restoreOperator = async (req, res) => {
             `UPDATE operator_details SET 
                 type_of_constitution = $1, business_background = $2, msme_type = $3, msme_number = $4, type_of_service = $5, currency_code = $6, address = $7, state = $8, 
                 region = $9, city = $10, country = $11, zip_code = $12, has_gstin = $13, aggregate_turnover_exceeded = $14, state_name = $15, state_code_number = $16, 
-                gstin = $17, head_office = $18, upload_gst = $19, aadar_front_doc = $20, aadar_back_doc = $21, pancard_front_doc = $22, pancard_back_doc = $23, msme_doc = $24, 
-                state_id = $25, country_id = $26, city_id = $27, aadar_front_file = $28, aadar_back_file = $29, pancard_front_file = $30, pancard_back_file = $31, msme_doc_file = $32
+                gstin = $17, head_office = $18, upload_gst = $19, aadar_front_doc = $20, aadar_back_doc = $21, pancard_front_doc = $22, pancard_back_doc = $23, msme_docs = $24, 
+                state_id = $25, country_id = $26, city_id = $27, aadar_front_file = $28, aadar_back_file = $29, pancard_front_file = $30, pancard_back_file = $31, msme_docs_file = $32
              WHERE tbs_operator_id = $33`,
             [
                 operatorDetails.type_of_constitution, operatorDetails.business_background, operatorDetails.msme_type, operatorDetails.msme_number, operatorDetails.type_of_service,
@@ -731,10 +731,14 @@ const permanentDeleteClient = async (req, res) => {
 //GET API FOR RECYCLE BIN
 const getRecycleBinEntries = async (req, res) => {
     const moduleGetId = req.params.module_get_id;
+    const id = req.params.id;  // This will either be tbs_user_id or tbs_operator_id
 
     try {
         let query;
         let params = [];
+
+        console.log("moduleGetId:", moduleGetId);
+        console.log("id (parameter):", id);
 
         if (moduleGetId == 10) {
             query = `
@@ -750,6 +754,22 @@ const getRecycleBinEntries = async (req, res) => {
                 WHERE rb.module_get_id = $1;`;
             params = [moduleGetId];
         } 
+        else if (moduleGetId == 6) {
+            // When module_get_id is 6, look for tbs_operator_id
+            query = `
+                SELECT *
+                FROM recycle_bin
+                WHERE deleted_data->'empPersonal'->>'tbs_operator_id' = $1;`;
+            params = [id];  // tbs_operator_id will be passed in the URL as the `id`
+        }
+        else if (moduleGetId == 2) {
+            // When module_get_id is 2, look for tbs_user_id
+            query = `
+                SELECT *
+                FROM recycle_bin
+                WHERE deleted_data->>'tbs_user_id' = $1;`;
+            params = [id];  // tbs_user_id will be passed in the URL as the `id`
+        } 
         else {
             query = `
                 SELECT *
@@ -760,6 +780,7 @@ const getRecycleBinEntries = async (req, res) => {
 
         const result = await pool.query(query, params);
 
+        console.log("Query Result:", result.rows);
         res.status(200).json(result.rows);
     } catch (err) {
         console.error('Error executing query', err.stack);

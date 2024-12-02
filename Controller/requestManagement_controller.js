@@ -561,7 +561,7 @@ const searchOffersDeals = async (req, res) => {
 //PUT Controller for Updating Status
 const updateOfferDealStatus = async (req, res) => {
     const offerId = req.params.tbs_offer_id;
-    const { req_status, req_status_id, status, status_id } = req.body;
+    const { req_status, req_status_id, status, status_id, comments } = req.body;
 
     if (!offerId || status ===undefined || status_id ===undefined || req_status_id === undefined || req_status === undefined) {
         return res.status(400).json("All fields are required");
@@ -577,10 +577,11 @@ const updateOfferDealStatus = async (req, res) => {
                 req_status = COALESCE(NULLIF($1, ''), req_status),
                 req_status_id = COALESCE(NULLIF($2::integer, NULL), req_status_id),
                 status = COALESCE(NULLIF($3, ''), status),
-                status_id = COALESCE(NULLIF($4::integer, NULL), status_id)
-            WHERE tbs_offer_id = $5
+                status_id = COALESCE(NULLIF($4::integer, NULL), status_id),
+                comments = COALESCE(NULLIF($5, ''), comments)
+            WHERE tbs_offer_id = $6
         `;
-        await client.query(updateQuery, [req_status, req_status_id, status, status_id, offerId]);
+        await client.query(updateQuery, [req_status, req_status_id, status, status_id, comments, offerId]);
 
         const offerQuery = `
             SELECT tbs_user_id, offer_name 
@@ -810,7 +811,7 @@ const searchDiscountOffersDeals = async (req, res) => {
 //PUT Controller for Updating Status
 const updateDiscountOfferDealStatus = async (req, res) => {
     const offerId = req.params.tbs_offer_id;
-    const { req_status, req_status_id, status, status_id } = req.body;
+    const { req_status, req_status_id, status, status_id, comments } = req.body;
 
     if (!offerId || req_status_id === undefined || req_status === undefined) {
         return res.status(400).json("All fields are required");
@@ -826,10 +827,11 @@ const updateDiscountOfferDealStatus = async (req, res) => {
                 req_status = COALESCE(NULLIF($1, ''), req_status),
                 req_status_id = COALESCE(NULLIF($2::integer, NULL), req_status_id),
                 status = COALESCE(NULLIF($3, ''), status),
-                status_id = COALESCE(NULLIF($4::integer, NULL), status_id)
-            WHERE tbs_offer_id = $5
+                status_id = COALESCE(NULLIF($4::integer, NULL), status_id),
+                comments = COALESCE(NULLIF($5, ''), comments)
+            WHERE tbs_offer_id = $6
         `;
-        await client.query(updateQuery, [req_status, req_status_id, status, status_id, offerId]);
+        await client.query(updateQuery, [req_status, req_status_id, status, status_id, comments, offerId]);
 
         const offerQuery = `
             SELECT tbs_user_id, offer_name 

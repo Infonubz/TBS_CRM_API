@@ -39,7 +39,7 @@ RECrouter.delete('/permanent-delete-partner/:tbs_recycle_id', permanentDeletePar
 RECrouter.post('/restore-clients/:tbs_recycle_id', restoreClient)
 RECrouter.delete('/permanent-delete-clients/:tbs_recycle_id', permanentDeleteClient)
 
-RECrouter.get('/recycle-bin/:module_get_id', getRecycleBinEntries)
+RECrouter.get('/recycle-bin/:module_get_id/:id?', getRecycleBinEntries)
 
 //SEARCH API
 RECrouter.post('/recycle-bin/:module_get_id', SearchRecycleBinEntries)
