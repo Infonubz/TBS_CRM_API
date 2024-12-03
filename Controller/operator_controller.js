@@ -230,8 +230,6 @@ try {
 // search CONTROLLER
 const searchOperator = async (req, res) => {
     const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : ''
-    
-    console.log(searchTerm)
 
     try {
         let query;
@@ -429,7 +427,6 @@ const operator_details = async (req, res) => {
                 pancardBackFile,
                 msmeDocFile
             ]);
-            console.log(msme_docs);
         }
 
         if (user_status || user_status_id || req_status || req_status_id) {
@@ -1129,12 +1126,12 @@ const getEmail = async (req, res) => {
                     FROM 
                             operators_tbl
                     WHERE 
-                            user_status_id = 1;`;
+                            user_status_id = 2;`;
         
         const result = await pool.query(query);
 
         if (result.rowCount === 0) {
-            return res.status(201).json({ error: 'Operator profile_img not found' });
+            return res.status(201).json({ error: 'Active Operators not found' });
         }
 
         res.status(200).json(result.rows);

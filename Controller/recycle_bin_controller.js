@@ -737,9 +737,6 @@ const getRecycleBinEntries = async (req, res) => {
         let query;
         let params = [];
 
-        console.log("moduleGetId:", moduleGetId);
-        console.log("id (parameter):", id);
-
         if (moduleGetId == 10) {
             query = `
                 SELECT *
@@ -780,7 +777,6 @@ const getRecycleBinEntries = async (req, res) => {
 
         const result = await pool.query(query, params);
 
-        console.log("Query Result:", result.rows);
         res.status(200).json(result.rows);
     } catch (err) {
         console.error('Error executing query', err.stack);

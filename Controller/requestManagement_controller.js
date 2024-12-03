@@ -515,8 +515,6 @@ const searchOffersDeals = async (req, res) => {
     try {
         const { req_status_id, search_term } = req.body;
         const searchTerm = search_term ? search_term.toLowerCase() : '';
-
-        console.log('Search Term:', searchTerm)
         
         let query = `
             SELECT *
@@ -540,9 +538,6 @@ const searchOffersDeals = async (req, res) => {
             query += ` AND (LOWER(offer_name) LIKE $${paramIndex} OR LOWER(code) LIKE $${paramIndex})`;
             queryParams.push(`%${searchTerm}%`);
         }
-
-        console.log('Executing query:', query);
-        console.log('With parameters:', queryParams);
 
         const { rows } = await pool.query(query, queryParams);
 
@@ -766,8 +761,6 @@ const searchDiscountOffersDeals = async (req, res) => {
         const { req_status_id, search_term } = req.body;
         const searchTerm = search_term ? search_term.toLowerCase() : '';
 
-        console.log('Search Term:', searchTerm);
-
         let query = `
             SELECT *
             FROM discount_offers
@@ -790,9 +783,6 @@ const searchDiscountOffersDeals = async (req, res) => {
             query += ` AND (LOWER(offer_name) LIKE $${paramIndex} OR LOWER(code) LIKE $${paramIndex})`;
             queryParams.push(`%${searchTerm}%`);
         }
-
-        console.log('Executing query:', query);
-        console.log('With parameters:', queryParams);
 
         const { rows } = await pool.query(query, queryParams);
 
@@ -914,7 +904,6 @@ const getAdvertisements = async (req, res) => {
 // GET by ID Controller for Advertisements
 const getAdvertisementById = async (req, res) => {
     const adId = req.params.tbs_ad_id;
-    console.log(adId);
     try {
         const query = `
             SELECT *
@@ -1046,9 +1035,6 @@ const searchAdvertisements = async (req, res) => {
             queryParams.push(`%${searchTerm}%`);
         }
 
-        console.log('Executing query:', query);
-        console.log('With parameters:', queryParams);
-
         const { rows } = await pool.query(query, queryParams);
 
         if (rows.length === 0) {
@@ -1169,7 +1155,6 @@ const getMobileAdvertisements = async (req, res) => {
 // GET by ID Controller for Mobile Advertisements
 const getMobileAdvertisementById = async (req, res) => {
     const adId = req.params.tbs_mobad_id;
-    console.log(adId);
     try {
         const query = `
             SELECT *
@@ -1588,9 +1573,6 @@ const searchClientDetails = async (req, res) => {
         const searchTerm = search_term ? search_term.toLowerCase() : '';
         const statusFilter = req_status_id ? req_status_id.toLowerCase() : '';
 
-        console.log('Search Term:', searchTerm);
-        console.log('Status Filter:', statusFilter);
-
         let query = `
             SELECT *
             FROM client_company_details ccd
@@ -1613,9 +1595,6 @@ const searchClientDetails = async (req, res) => {
             query += ` AND (LOWER(ccd.company_name) LIKE $${paramIndex} OR LOWER(ccd.owner_name) LIKE $${paramIndex})`;
             queryParams.push(`%${searchTerm}%`);
         }
-
-        console.log('Executing query:', query);
-        console.log('With parameters:', queryParams);
 
         const { rows } = await pool.query(query, queryParams);
 

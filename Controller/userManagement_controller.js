@@ -1,4 +1,5 @@
 const pool = require('../config/db')
+const nodemailer = require('nodemailer')
 
 //user management-OPERATORS GET CONTROLLER
 const getAllOperatorDetails = async (req, res) => {
@@ -45,53 +46,158 @@ const getOperatorByID = async (req, res) => {
 }
 
 //user management-OPERATORS PUT status & status_id CONTROLLER
+const transporter = nodemailer.createTransport({
+    host: 'smtp.office365.com',
+    port: 587,
+    secure: false,
+    auth: {
+        user: 'no-reply@thebusstand.com',
+        pass: 'bdqbqlgqgcnnrxrr', 
+    },
+})
+const sendMail = async (emailid, subject, htmlContent) => {
+    const mailOptions = {
+        to: emailid,
+        from: 'no-reply@thebusstand.com',
+        subject: subject,
+        html: htmlContent,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error(`Failed to send email to ${emailid}:`, error.message);
+        throw error; 
+    }
+};
+
 const putUser_Status = async (req, res) => {
     try {
         const tbs_operator_id = req.params.tbs_operator_id;
         const { user_status, user_status_id, req_status, req_status_id } = req.body;
 
-        const queryResult = await pool.query('SELECT owner_name FROM operators_tbl WHERE tbs_operator_id = $1', [tbs_operator_id]);
+        const queryResult = await pool.query(
+            'SELECT owner_name, emailid, password FROM operators_tbl WHERE tbs_operator_id = $1',
+            [tbs_operator_id]
+        );
 
         if (queryResult.rows.length === 0) {
-            return res.status(201).json({ error: 'Operator not found' });
+            return res.status(404).json({ error: 'Operator not found' });
+        }
+
+        const { owner_name, emailid, password } = queryResult.rows[0];
+
+        if (!emailid || !/\S+@\S+\.\S+/.test(emailid)) {
+            console.error("Invalid or missing email ID:", emailid);
+            return res.status(400).json({ error: 'Invalid email address' });
         }
 
         let generate_key = null;
 
         if (user_status_id === 2) {
-            const owner_name = queryResult.rows[0].owner_name;
             const owner_initials = owner_name.slice(0, 3).toUpperCase();
-            const randomDigits = Math.round(Math.random() * 1E13).toString().padStart(13, '0');
+            const randomDigits = Math.round(Math.random() * 1e13).toString().padStart(13, '0');
             generate_key = `${owner_initials}${randomDigits}`;
         }
 
-        const updateResult = await pool.query(`
-            UPDATE operators_tbl 
-            SET 
-                user_status = $1,
-                user_status_id = $2,
-                generate_key = COALESCE($3, generate_key),
-                req_status = $4,
-                req_status_id = $5
-            WHERE tbs_operator_id = $6`,
+        await pool.query(
+            `UPDATE operators_tbl 
+             SET 
+                 user_status = $1,
+                 user_status_id = $2,
+                 generate_key = COALESCE($3, generate_key),
+                 req_status = $4,
+                 req_status_id = $5
+             WHERE tbs_operator_id = $6`,
             [user_status, user_status_id, generate_key, req_status, req_status_id, tbs_operator_id]
-        )
+        );
 
         if (user_status_id === 2) {
-            res.status(200).json({
+            const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px;">
+            <div style="background-color: #1F487C; padding: 10px; border-radius: 10px 10px 0 0; text-align: center; color: #fff;">
+              <a href="http://192.168.90.43:8082/operator" style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0; text-decoration: none;">
+                THEBUSSTAND.COM
+              </a>
+            </div>
+            <div style="padding: 20px; background-color: #ffffff; text-align: center; border: 3px solid #1F487C; border-radius: 0 0 10px 10px;">
+              <h2 style="color: #1F487C; font-size: 22px; margin-bottom: 8px;">Welcome to TheBusStand.com!</h2>
+              <p style="font-size: 16px; color: #1F487C; margin-bottom: 15px;">
+                We're excited to have you on board. Your account is now <strong>Active</strong>.
+              </p>
+              <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                Below are your account details:
+              </p>
+              <div style="text-align: left; font-size: 16px; color: #1F487C; background-color: #F4F6F8; padding: 15px; margin: 10px auto; border-radius: 8px; border: 1px solid #D2DAE5;">
+                <p><strong>Email ID:</strong> ${emailid}</p>
+                <p><strong>Password:</strong> ${password}</p>
+                <p><strong>Login URL:</strong> <a href=http://192.168.90.43:8082/operator style="color: #1F487C; text-decoration: none;">Click here to login</a></p>
+              </div>
+              <p style="font-size: 12px; color: #777; margin-top: 15px;">
+                If you have any questions, feel free to reach out to our support team.
+              </p>
+            </div>
+            <div style="padding: 10px; background-color: #D2DAE5; text-align: center; border-radius: 0 0 10px 10px;">
+              <p style="font-size: 12px; color: #999; margin: 0;">
+                This email was sent by TheBusStand no-replay.
+              </p>
+              <p style="font-size: 12px; color: #999; margin: 5px 0 0 0;">
+                © 2024 TheBusStand. All rights reserved.
+              </p>
+            </div>
+          </div>`;
+            await sendMail(emailid, 'Welcome to TheBusStand.com', htmlContent);
+
+            return res.status(200).json({
                 message: 'User Status is Active and Key generated successfully',
-                'Generated Key': generate_key
-            });
-        } else {
-            res.status(200).json({
-                message: 'User status updated successfully'
+                'Generated Key': generate_key,
             });
         }
+
+        if (user_status_id === 3) {
+            const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px;">
+            <div style="background-color: #1F487C; padding: 10px; border-radius: 10px 10px 0 0; text-align: center; color: #fff;">
+              <a href="http://192.168.90.43:8082/operator" style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0; text-decoration: none;">
+                THEBUSSTAND.COM
+              </a>
+            </div>
+            <div style="padding: 20px; background-color: #ffffff; text-align: center; border: 3px solid #1F487C; border-radius: 0 0 10px 10px;">
+              <h2 style="color: #1F487C; font-size: 22px; margin-bottom: 8px;">Account Status Update</h2>
+              <p style="font-size: 16px; color: #1F487C; margin-bottom: 15px;">
+                Your account status has been updated to <strong>inactive</strong>.
+              </p>
+              <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                If you believe this is an error or have questions, please contact our support team for assistance.
+              </p>
+              <div style="padding: 10px; text-align: center;">
+                <a href="mailto:support@thebusstand.com" style="text-decoration: none; font-size: 16px; color: #fff; background-color: #1F487C; padding: 10px 20px; border-radius: 5px;">
+                  Contact Support
+                </a>
+              </div>
+            </div>
+            <div style="padding: 10px; background-color: #D2DAE5; text-align: center; border-radius: 0 0 10px 10px;">
+              <p style="font-size: 12px; color: #999; margin: 0;">
+                This email was sent by TheBusStand Support.
+              </p>
+              <p style="font-size: 12px; color: #999; margin: 5px 0 0 0;">
+                © 2024 TheBusStand. All rights reserved.
+              </p>
+            </div>
+          </div>`;
+            await sendMail(emailid, 'Account Status Update', htmlContent);
+
+            return res.status(200).json({
+                message: 'User status updated to inactive successfully',
+            });
+        }
+
+        res.status(200).json({ message: 'User status updated successfully' });
     } catch (error) {
         console.error('Error updating user:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-}
+};
 
 //user management-PARTNERS GETbyID CONTROLLER
 const getAllPartnerDetails = async (req, res) => {
@@ -236,7 +342,6 @@ const searchProEmpDetails = async (req, res) => {
         console.error('Error executing query', err);
         res.status(500).json({ message: "Error searching records" });
     }
-};
-
+} 
 
 module.exports = { getAllOperatorDetails, getOperatorByID, putUser_Status, getAllPartnerDetails, getPartnerByID, searchPartnerDetails, searchClientDetails, searchProEmpDetails }

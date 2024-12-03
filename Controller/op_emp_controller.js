@@ -32,7 +32,6 @@ const createEMP = async (req, res, next) => {
   
       const tbs_op_emp_id = result.rows[0].tbs_op_emp_id;
   
-      console.log(`New Employee created with ID: ${tbs_op_emp_id}`);
       const password = `EMP@${tbs_op_emp_id}`;
       await pool.query(
         `UPDATE op_emp_personal_details SET password = $1 WHERE tbs_op_emp_id = $2`,
@@ -99,7 +98,6 @@ const createEMP = async (req, res, next) => {
 const updateProfile = async (req, res) => {
     const id = req.params.tbs_op_emp_id;
     const profile_img = req.file ? `/op_employee_documents/${req.file.filename}` : null;
-    console.log('profile_img:', profile_img);
 
     if (!profile_img === null) {
         return res.status(400).json({ error: 'Missing required fields' });
@@ -255,7 +253,6 @@ const getAllOPEMPbyOPid = async (req, res) => {
   //employee-peraonal-details GETbyID CONTROLLER
   const getEMPByID = async (req, res) => {
     const  id = req.params.tbs_op_emp_id
-    console.log(id)
     try {
       const result = await pool.query(`SELECT tbs_op_emp_id, emp_first_name,emp_last_name,phone,email_id,alternate_phone,date_of_birth,gender,blood_group, temp_add, temp_country, temp_state, temp_city, temp_region, temp_zip_code,
       perm_add, perm_country, perm_state, perm_city, perm_region, perm_zip_code, profile_img FROM op_emp_personal_details WHERE tbs_op_emp_id = $1`, [id])
@@ -370,7 +367,6 @@ const getAllEmployees = async (req, res) => {
 //employee-address-details GETbyID CONTROLLER
 const getEmployeeById = async (req, res) => {
     const employeeId = req.params.tbs_op_emp_id
-    console.log(employeeId)
     try {
         const query = `SELECT 
                             tbs_op_emp_id,
@@ -593,7 +589,6 @@ const AddEmpDoc = async (req, res) => {
       const checkResult = await pool.query(checkQuery, [tbs_op_emp_id]);
   
       if (checkResult.rows[0].has_null_columns) {
-        console.log("Some columns are NULL. Status cannot be updated.");
         return { success: false, message: "Some columns are NULL. Status not updated." };
       }
   
@@ -603,8 +598,7 @@ const AddEmpDoc = async (req, res) => {
         WHERE tbs_op_emp_id = $1 `;
   
       await pool.query(updateEmpStatusQuery, [tbs_op_emp_id]);
-  
-      console.log("Employee status updated successfully.");  
+   
       res.status(200).json('Employee professional documents are uploaded successfully');
     } catch (error) {
       console.error('Error:', error);
@@ -820,13 +814,6 @@ const putEmployee = async (req, res) => {
       size: req.files['other_documents'][0].size,
       created_date: new Date().toISOString()
   } : null
-
-  console.log('profile_img:', profile_img)
-  console.log('aadhar_card_doc:', aadhar_card_doc)
-  console.log('pan_card_doc:', pan_card_doc)
-  console.log('offer_letter_doc:', offer_letter_doc)
-  console.log('qualification_doc:', qualification_doc)
-  console.log('other_documents:', other_documents)
 
   try {
       await pool.query('BEGIN') 

@@ -64,7 +64,6 @@ const postRole = async (req, res) => {
     }
 
     const normalizedUser = user.toLowerCase();
-    console.log("Normalized User:", normalizedUser);
 
     let userId;
     if (normalizedUser === 'operator') {

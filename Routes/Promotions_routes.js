@@ -64,7 +64,7 @@ promotionsRouter.post('/promo/importxlsx', (req, res, next) => {
         });
     })
 
-promotionsRouter.get('/promo-status/:user_id', getPromobyStatus);
+promotionsRouter.get('/promo-status/:user_status_id', getPromobyStatus);
 promotionsRouter.put('/promo-statusId/:promo_id', putPromoStatus);
 promotionsRouter.get('/promo/search/:searchTerm', searchPromo);
 promotionsRouter.get('/promo-operatorDetails', getOperatorRecords);

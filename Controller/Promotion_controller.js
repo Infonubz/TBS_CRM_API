@@ -73,15 +73,15 @@ const getPromobyId = async (req, res) => {
 //GET PROMOTION BY STATUS
 const getPromobyStatus = async (req, res) => {
     try {
-        const id = parseInt(req.params.user_id);
+        const id = parseInt(req.params.user_status_id);
 
         let getPromoStatus;
         let values;
 
-        if (id === 4) {
+        if (id === 5) {
             getPromoStatus = `SELECT * FROM promotions_tbl ORDER BY created_date DESC`;
         } else {
-            getPromoStatus = `SELECT * FROM promotions_tbl WHERE user_id = $1 ORDER BY created_date DESC`;
+            getPromoStatus = `SELECT * FROM promotions_tbl WHERE user_status_id = $1 ORDER BY created_date DESC`;
             values = [id];
         }
 
@@ -138,7 +138,7 @@ const deletePromo = async (req, res) => {
             usage: promo.usage,
             promo_status_id: promo.promo_status_id,
             promo_status: promo.promo_status,
-            user_id: promo.user_id,
+            user_status_id: promo.user_status_id,
             user_status: promo.user_status,
             promo_description: promo.promo_description,
             promo_image: promo.promo_image,
@@ -212,7 +212,7 @@ const deletePromo = async (req, res) => {
  
 //POST PROMOTION
 const postPromo = async (req, res) => {
-    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, tbs_user_id, promo_value, promo_code, value_symbol } = req.body;
+    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_status_id, user_status, promo_description, tbs_user_id, promo_value, promo_code, value_symbol } = req.body;
 
     if (req.file) {
         if (req.file.size > 5 * 1024 * 1024) {
@@ -281,7 +281,7 @@ const postPromo = async (req, res) => {
         }
 
         const insertPromo = `
-            INSERT INTO promotions_tbl (promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, promo_image, tbs_user_id, background_image, promo_img_details, promo_value, promo_code, value_symbol)
+            INSERT INTO promotions_tbl (promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_status_id, user_status, promo_description, promo_image, tbs_user_id, background_image, promo_img_details, promo_value, promo_code, value_symbol)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING promo_id
         `;
@@ -293,7 +293,7 @@ const postPromo = async (req, res) => {
             usage, 
             promo_status_id, 
             promo_status, 
-            user_id, 
+            user_status_id, 
             user_status, 
             promo_description, 
             promoImgDetails.promo_image.path, 
@@ -407,9 +407,9 @@ const putPromo = async (req, res) => {
 const putPromoStatus = async (req, res) => {
     try {
         const ID = req.params.promo_id
-        const { promo_status_id, promo_status, user_id, user_status } = req.body
+        const { promo_status_id, promo_status, user_status_id, user_status } = req.body
  
-        if (!ID || !promo_status_id || !promo_status || !user_id || !user_status) {
+        if (!ID || !promo_status_id || !promo_status || !user_status_id || !user_status) {
             return res.status(400).json("Invalid request body")
         }
  
@@ -417,12 +417,12 @@ const putPromoStatus = async (req, res) => {
             UPDATE promotions_tbl SET
                 promo_status_id = $1,
                 promo_status = $2,
-                user_id = $3,
+                user_status_id = $3,
                 user_status = $4
             WHERE promo_id = $5
             RETURNING *
         `
-        const values = [promo_status_id, promo_status, user_id, user_status, ID]
+        const values = [promo_status_id, promo_status, user_status_id, user_status, ID]
         const result = await pool.query(updatePromoStatus, values)
  
         if (result.rowCount === 0) {
@@ -638,7 +638,6 @@ const promoFilterByDate = async (req, res) => {
             }
     
             res.status(200).send('File uploaded and data saved successfully.');
-            console.log('File uploaded and data saved successfully.');
         } catch (error) {
             console.error('Error processing file:', error);
             res.status(500).send('Error processing file.');

@@ -62,7 +62,6 @@ const BulkMail = async (req, res) => {
                 console.error('Error sending email:', error);
                 return res.status(500).json({ error: 'Failed to send email', details: error });
             }
-            console.log('Email sent:', info.response);
             res.status(200).json({ message: 'Email sent' });
         });
     } catch (err) {

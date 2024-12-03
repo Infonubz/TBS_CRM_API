@@ -1,6 +1,7 @@
 const pool = require('../config/db')
 const jwt = require('jsonwebtoken')
 const xlsx = require('xlsx')
+const nodemailer = require('nodemailer')
 const moment = require('moment')
 
 
@@ -31,7 +32,6 @@ const createEMPpro = async (req, res, next) => {
         );
   
         const tbs_pro_emp_id = result.rows[0].tbs_pro_emp_id;
-        console.log(`New Employee created with ID: ${tbs_pro_emp_id}`);
         
         const password = `EMP@${tbs_pro_emp_id}`;
         await pool.query(
@@ -209,7 +209,6 @@ const getAllEMPpro = async (req, res) => {
 //employee-peraonal-details GETbyID CONTROLLER
 const getEMPByIDpro = async (req, res) => {
     const  id = req.params.tbs_pro_emp_id
-    console.log(id)
     try {
       const result = await pool.query(`SELECT tbs_pro_emp_id, emp_first_name,emp_last_name,phone,email_id,alternate_phone,date_of_birth,gender,blood_group, temp_add, temp_country, temp_state, temp_city, temp_zip_code,
       perm_add, perm_country, perm_state, perm_city, perm_zip_code, profile_img FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`, [id])
@@ -324,7 +323,6 @@ const getAllEmployeespro = async (req, res) => {
 //employee-address-details GETbyID CONTROLLER
 const getEmployeeByIdpro = async (req, res) => {
     const employeeId = req.params.tbs_pro_emp_id
-    console.log(employeeId)
     try {
         const query = `SELECT 
                             tbs_pro_emp_id,
@@ -429,6 +427,31 @@ const fetchdataByIdpro = async (req, res) => {
 }
 
 //employee-professional-documents POST CONTROLLER
+const sendMail = async (emailid, subject, htmlContent) => {
+    const transporter = nodemailer.createTransport({
+        host: 'smtp.office365.com',
+        port: 587,
+        secure: false,
+        auth: {
+            user: 'no-reply@thebusstand.com',
+            pass: 'bdqbqlgqgcnnrxrr', 
+        },
+    });
+
+    const mailOptions = {
+        to: emailid,
+        from: 'no-reply@thebusstand.com',
+        subject: subject,
+        html: htmlContent,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`Email sent successfully to ${emailid}`);
+    } catch (error) {
+        console.error(`Failed to send email to ${emailid}:`, error);
+    }
+};
 const AddEmpDocpro = async (req, res) => {
     const { tbs_pro_emp_id } = req.params;
     const { aadhar_card_number, pan_card_number } = req.body;
@@ -529,38 +552,45 @@ const AddEmpDocpro = async (req, res) => {
   
       const checkQuery = `
       SELECT 
-      CASE 
-          WHEN EXISTS (
-              SELECT 1
-              FROM pro_emp_personal_details pd
-              LEFT JOIN pro_emp_professional_details prd ON pd.tbs_pro_emp_id = prd.tbs_pro_emp_id
-              WHERE pd.tbs_pro_emp_id = $1
+        pd.email_id,
+        pd.password,  -- Replace this with the correct column name for the password if it differs
+        CASE 
+            WHEN EXISTS (
+                SELECT 1
+                FROM pro_emp_personal_details pd
+                LEFT JOIN pro_emp_professional_details prd ON pd.tbs_pro_emp_id = prd.tbs_pro_emp_id
+                WHERE pd.tbs_pro_emp_id = $1
                 AND (
-                  pd.emp_first_name IS NULL OR 
-                  pd.emp_last_name IS NULL OR 
-                  pd.phone IS NULL OR 
-                  pd.email_id IS NULL OR 
-                  pd.date_of_birth IS NULL OR 
-                  pd.gender IS NULL OR 
-                  pd.temp_add IS NULL OR 
-                  pd.perm_add IS NULL OR 
-                  prd.joining_date IS NULL OR 
-                  prd.designation IS NULL OR 
-                  prd.branch IS NULL OR 
-                  prd.aadhar_card_number IS NULL OR 
-                  prd.pan_card_number IS NULL OR 
-                  prd.qualification_doc IS NULL OR 
-                  prd.offer_letter_doc IS NULL
+                    pd.emp_first_name IS NULL OR 
+                    pd.emp_last_name IS NULL OR 
+                    pd.phone IS NULL OR 
+                    pd.email_id IS NULL OR 
+                    pd.date_of_birth IS NULL OR 
+                    pd.gender IS NULL OR 
+                    pd.temp_add IS NULL OR 
+                    pd.perm_add IS NULL OR 
+                    prd.joining_date IS NULL OR 
+                    prd.designation IS NULL OR 
+                    prd.branch IS NULL OR 
+                    prd.aadhar_card_number IS NULL OR 
+                    prd.pan_card_number IS NULL OR 
+                    prd.qualification_doc IS NULL OR 
+                    prd.offer_letter_doc IS NULL
                 )
-          ) THEN TRUE
-          ELSE FALSE
-      END AS has_null_columns;  `;
+            ) THEN TRUE
+            ELSE FALSE
+        END AS has_null_columns
+    FROM pro_emp_personal_details pd
+    WHERE pd.tbs_pro_emp_id = $1; `;
   
       const checkResult = await pool.query(checkQuery, [tbs_pro_emp_id]);
   
       if (checkResult.rows[0].has_null_columns) {
-        console.log("Some columns are NULL. Status cannot be updated.");
         return { success: false, message: "Some columns are NULL. Status not updated." };
+      }
+      const {email_id, password} = checkResult.rows[0] || {};
+      if (!email_id || !password) {
+          throw new Error('Missing email or password in database results.');
       }
   
       const updateEmpStatusQuery = `
@@ -570,13 +600,62 @@ const AddEmpDocpro = async (req, res) => {
   
       await pool.query(updateEmpStatusQuery, [tbs_pro_emp_id]);
   
-      console.log("Employee status updated successfully.");  
-      res.status(200).json('Employee professional documents are uploaded successfully');
+      const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px;">
+        <!-- Header -->
+        <div style="background-color: #1F487C; padding: 10px; border-radius: 10px 10px 0 0; text-align: center; color: #fff;">
+            <a href="http://192.168.6.52:3000/poemployee" style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0; text-decoration: none;">
+                THEBUSSTAND.COM
+            </a>
+        </div>
+        <!-- Content -->
+        <div style="padding: 20px; background-color: #ffffff; text-align: center; border: 3px solid #1F487C; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #1F487C; font-size: 22px; margin-bottom: 8px;">Welcome to TheBusStand!</h2>
+            <p style="font-size: 16px; color: #1F487C; margin-bottom: 15px;">
+                We are thrilled to have you on board. Your account has been successfully <strong>Activated</strong>.
+            </p>
+            <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                Here are your login credentials:
+            </p>
+            <div style="text-align: left; margin: 15px auto; width: fit-content; border: 1px solid #1F487C; padding: 10px; border-radius: 8px;">
+                <p style="font-size: 14px; color: #333; margin: 5px 0;">
+                    <strong>Email ID:</strong> <span style="color: #1F487C;">${email_id}</span>
+                </p>
+                <p style="font-size: 14px; color: #333; margin: 5px 0;">
+                    <strong>Password:</strong> <span style="color: #1F487C;">${password}</span>
+                </p>
+                <p style="font-size: 14px; color: #333; margin: 5px 0;">
+                    <strong>Login URL:</strong> <a href="http://192.168.6.52:3000/poemployee" style="color: #1F487C; text-decoration: none;">Click here to login</a>
+                </p>
+            </div>
+            <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                If you have any questions or concerns, feel free to reach out to our support team.
+            </p>
+            <div style="padding: 10px; text-align: center;">
+                <a href="mailto:support@thebusstand.com" style="text-decoration: none; font-size: 16px; color: #fff; background-color: #1F487C; padding: 10px 20px; border-radius: 5px;">
+                    Contact Support
+                </a>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div style="padding: 10px; background-color: #D2DAE5; text-align: center; border-radius: 0 0 10px 10px;">
+            <p style="font-size: 12px; color: #999; margin: 0;">
+                This email was sent by TheBusStand Support.
+            </p>
+            <p style="font-size: 12px; color: #999; margin: 5px 0 0 0;">
+                © 2024 TheBusStand. All rights reserved.
+            </p>
+        </div>
+    </div>`;
+
+        await sendMail(email_id, 'Account Activation Notification', htmlContent);
+
+        res.status(200).json('Employee professional documents are uploaded successfully, and notification email sent.');
     } catch (error) {
-      console.error('Error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+        console.error('Error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-} 
+}
 
 //employee-professional-documents GET CONTROLLER
 const FetchAllDocspro = async (req, res) => {
@@ -784,13 +863,6 @@ const putEmployeepro = async (req, res) => {
     size: req.files['offer_letter_doc'][0].size,
     created_date: new Date().toISOString()
   } : null
-
-
-  console.log('profile_img:', profile_img)
-  console.log('aadhar_card_front_doc:', aadhar_card_front_doc)
-  console.log('pan_card_front_doc:', pan_card_front_doc)
-  console.log('offer_letter_doc:', offer_letter_doc)
-  console.log('qualification_doc:', qualification_doc)
 
   try {
     await pool.query('BEGIN')

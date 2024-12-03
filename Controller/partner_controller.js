@@ -71,8 +71,6 @@ const createPartner = async (req, res) => {
 
     const tbs_partner_id = result.rows[0].tbs_partner_id
 
-    console.log(`New Partner created with ID: ${tbs_partner_id}`)
-
     const password = `PAT@${tbs_partner_id}`
     await pool.query(
       `UPDATE partner_details SET password = $1 WHERE tbs_partner_id = $2`,
@@ -241,7 +239,6 @@ const getPartner = async (req, res) => {
 // partner details GETbyID CONTROLLER
 const getPartnerByID = async (req, res) => {
     const  id = req.params.tbs_partner_id
-    console.log(id)
     try {
       const result = await pool.query('SELECT * FROM partner_details WHERE tbs_partner_id = $1', [id])
       if (result.rows.length === 0) {
@@ -512,7 +509,6 @@ const updatePartnerDetails = async (req, res) => {
     temp_add, temp_country, temp_state, temp_city, temp_zip_code, temp_region,
     perm_add, perm_country, perm_state, perm_city, perm_zip_code, perm_region
   } = req.body
- console.log(req.body)
   try {
     const query = `
       UPDATE partner_details
@@ -573,7 +569,6 @@ const getAllPartners = async (req, res) => {
 //partner address details GETbyID CONTROLLER
 const getPartnerAddressById = async (req, res) => {
     const PartnerId = req.params.tbs_partner_id
-    console.log(PartnerId)
     try {
         const query = `SELECT 
                             tbs_partner_id,
@@ -738,7 +733,6 @@ const importPartnerDetails = async (req, res) => {
 
       await pool.query(documentInsertQuery, documentInsertValues);
 
-      console.log(`Partner with ID ${tbs_partner_id} imported successfully`);
     }
 
     await pool.query('COMMIT');

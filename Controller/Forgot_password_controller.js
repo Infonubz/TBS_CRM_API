@@ -28,7 +28,6 @@ const forgotPassword = async (req, res) => {
     const userResult = await pool.query(`SELECT * FROM product_owner_tbl WHERE email_id = $1`, [email_id])
     
     const user = userResult.rows[0]
-    console.log(userResult)
     if (!user) {
       return res.status(400).json({ message: 'User not found' })
     }

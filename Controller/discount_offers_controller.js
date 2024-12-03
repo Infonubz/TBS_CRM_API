@@ -209,7 +209,7 @@ const updateOffer = async (req, res) => {
                 code = COALESCE($3, code), 
                 start_date = COALESCE($4, start_date), 
                 expiry_date = COALESCE($5, expiry_date), 
-                usage = COALESCE($6, usage), 
+                usage = COALESCE($6::INTEGER, usage), 
                 status = COALESCE($7, status), 
                 status_id = COALESCE($8::INTEGER, status_id), 
                 offer_desc = COALESCE($9, offer_desc), 

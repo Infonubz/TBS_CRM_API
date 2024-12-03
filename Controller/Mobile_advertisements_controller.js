@@ -193,8 +193,6 @@ const postMobAd = async (req, res) => {
         tbs_user_id, hours, duration, ads_plan_id, ads_req_status, ads_req_status_id
     } = req.body;
 
-    console.log('Request Body:', req.body);
-
     if (!tbs_user_id) {
         return res.status(400).json({ message: 'User ID is required' });
     }
@@ -206,8 +204,6 @@ const postMobAd = async (req, res) => {
     const uploadMobAdUrl = req.file ? `/mobile_advertisement_files/${req.file.filename}` : null;
     const mobad_file_size = req.file ? req.file.size : null;
     const mobad_file_type = req.file ? req.file.mimetype : null;
-
-    console.log(uploadMobAdUrl);
 
     let employeeName = '';
     let isActive = false;
@@ -311,7 +307,6 @@ const postMobAd = async (req, res) => {
                 [tbs_user_id, employeeName, 'product_owner_employee', mobad_title, 'mobile_advertisement', notificationMessage, false]
             );
 
-            console.log('Notification sent:', notificationMessage);
         } else if (tbs_user_id.startsWith('tbs-pro')) {
             await pool.query(
                 `UPDATE product_owner_tbl SET advertisements = array_append(advertisements, $1) WHERE owner_id = $2`,

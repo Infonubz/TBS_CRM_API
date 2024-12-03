@@ -71,7 +71,6 @@ const sheetUpload = async (req, res) => {
 
 const postData = (req, res) => {
     const { field_id, select_fields } = req.body
-    console.log('Request Body:', req.body)
 
     // Check if file upload exceeded size limit
     if (req.file && req.file.size > 5 * 1024 * 1024) {
@@ -106,8 +105,7 @@ const postData = (req, res) => {
 const putData = (req, res) => {
     const ID = req.params.imp_id
     const { field_id, select_fields } = req.body
-    console.log('Request Body:', req.body)
-
+    
     if (req.file && req.file.size > 15 * 1024 * 1024) {
         return res.status(400).send('File size exceeded (Max: 15MB)')
     }

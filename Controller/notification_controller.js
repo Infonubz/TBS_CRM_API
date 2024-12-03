@@ -234,7 +234,6 @@ const searchOperatorNotification = async (req, res) => {
 // Get operator_employee notification by ID
 const opEmpnotificationGetById = async (req, res) => {
     const { tbs_op_emp_id } = req.params
-    console.log(tbs_op_emp_id);
     try {
         const notificationQuery = `
             SELECT * 
@@ -314,7 +313,6 @@ const searchOpEmpNotification = async (req, res) => {
 // Get product_owner_employee notification by ID
 const proEmpNotificationGetById = async (req, res) => {
     const { tbs_pro_emp_id } = req.params;
-    console.log(tbs_pro_emp_id);
     try {
         const notificationQuery = `
             SELECT * 

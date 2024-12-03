@@ -75,7 +75,6 @@ const Inquiry = async (req, res) => {
                 console.log('Error:', error);
                 res.status(500).send('There was an error sending your inquiry. Please try again later.');
             } else {
-                console.log('Email sent:', info.response);
                 res.send('Thank you for your inquiry! We will get back to you soon.');
             }
         });

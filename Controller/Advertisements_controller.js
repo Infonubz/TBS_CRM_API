@@ -375,9 +375,7 @@ const postAd = async (req, res) => {
             const employee = employeeResult.rows[0];
          
          isActive = employee.emp_status_id === 1 && employee.emp_status.toLowerCase() === 'active';
-            console.log(employee.emp_status_id, employee.emp_status);
             employeeName = employee.emp_first_name || 'Unknown';
-            console.log(isActive);
 
             if (!isActive) {
                 return res.status(400).json({ message: 'Employee status is not active' });
@@ -430,7 +428,6 @@ const postAd = async (req, res) => {
                 [tbs_user_id, employeeName, 'product_owner_employee', ad_title, 'advertisement', notificationMessage, false]
             );
 
-            console.log('Notification sent:', notificationMessage);
         } else if (tbs_user_id.startsWith('tbs-pro')) {
             await pool.query(
                 `UPDATE product_owner_tbl SET advertisements = array_append(advertisements, $1) WHERE owner_id = $2`,

@@ -41,12 +41,6 @@ const postCrudPermissions = async (req, res) => {
         return res.status(400).json({ error: 'Invalid module_permissions format' });
     }
 
-    console.log({
-        crud_permissions,
-        parsedModulePermissions,
-        crud_permission_id
-    });
-
     const updateCrudPermissionsQuery = `
         UPDATE public.active_crud_permissions_tbl
         SET crud_permissions = COALESCE($1::text[], crud_permissions), 

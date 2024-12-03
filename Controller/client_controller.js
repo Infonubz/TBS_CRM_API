@@ -21,8 +21,6 @@ const postClient = async (req, res) => {
         
         const tbs_client_id = result.rows[0].tbs_client_id
 
-        console.log(`New client created with ID: ${tbs_client_id}`)
-
         const password = `CLT@${tbs_client_id}`
 
         await pool.query(
@@ -429,8 +427,6 @@ const ExcelUpload = async (req, res) => {
         const sheet = workbook.Sheets[sheetName];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        console.log('Parsed Data:', data);
-
         await pool.query('BEGIN');
 
         for (const row of data) {
@@ -441,8 +437,6 @@ const ExcelUpload = async (req, res) => {
                     row['business_background'], row['web_url'],
                     row['status'], row['status_id']
                 ];
-
-                console.log('Inserting client data:', clientData);
 
                 const result = await pool.query(
                     `INSERT INTO client_company_details (
@@ -457,7 +451,6 @@ const ExcelUpload = async (req, res) => {
                 const tbs_client_id = result.rows[0].tbs_client_id;
 
                 const password = `CLT@${tbs_client_id}`;
-                console.log('Generated password:', password);
 
                 await pool.query(
                     `UPDATE client_company_details
@@ -478,7 +471,6 @@ const ExcelUpload = async (req, res) => {
                     row['state_code_number'], row['gstin'], row['head_office']
                 ];
 
-                console.log('Updating address details:', addressData);
                 await pool.query(
                     `UPDATE client_address_details
                      SET address = $2, state = $3, state_id = $4,
@@ -489,7 +481,6 @@ const ExcelUpload = async (req, res) => {
                     addressData
                 );
 
-                console.log('Updating GST details:', gstData);
                 await pool.query(
                     `UPDATE client_gst_details
                      SET has_gstin = $2, aggregate_turnover_exceeded = $3,
