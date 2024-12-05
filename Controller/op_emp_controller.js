@@ -3,6 +3,52 @@ const jwt = require('jsonwebtoken')
 const xlsx = require('xlsx')
 const moment = require('moment')
 
+//check operator email exist or not
+const getEmails = async (req, res) => {
+    const { emailid } = req.body;
+
+    try {
+        if (!emailid) {
+            return res.status(400).json({ success: false, message: "Email ID is required" });
+        }
+
+        const emailQuery = `SELECT 1 FROM op_emp_personal_details WHERE email_id = $1 LIMIT 1`;
+        const result = await pool.query(emailQuery, [emailid]);
+
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking email existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+}
+
+//check operator mobile exist or not
+const getPhones = async (req, res) => {
+    const { phone } = req.body;
+
+    try {
+        if (!phone) {
+            return res.status(400).json({ success: false, message: "Phone Number is required" });
+        }
+
+        const PhoneQuery = `SELECT 1 FROM op_emp_personal_details WHERE phone = $1 LIMIT 1`;
+        const result = await pool.query(PhoneQuery, [phone]);
+
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking phone existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+}
+
 //employee-peraonal-details POST CONTROLLER
 const createEMP = async (req, res, next) => {
     const { emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, tbs_operator_id } = req.body;
@@ -975,6 +1021,7 @@ const employeeLogin = async (req, res) => {
 //search employees
 const searchEmployees = async (req, res) => {
     let searchTerm = req.params.search_term ? req.params.search_term.trim().toLowerCase() : ''
+    const  tbs_operator_id  = req.params.tbs_operator_id
 
     try {
         let query
@@ -983,11 +1030,11 @@ const searchEmployees = async (req, res) => {
         if (searchTerm) {
             query = `
                 SELECT * FROM op_emp_personal_details 
-                WHERE LOWER(emp_first_name) LIKE $1
-                    OR LOWER(email_id) LIKE $1
-                    OR phone::TEXT LIKE $1
+                WHERE tbs_operator_id = $1 AND (LOWER(emp_first_name) LIKE $2
+                    OR LOWER(email_id) LIKE $2
+                    OR phone::TEXT LIKE $2)
             `
-            queryParams = [`%${searchTerm}%`]
+            queryParams = [tbs_operator_id, `%${searchTerm}%`]
         } else {
             query = `SELECT * FROM op_emp_personal_details `
             queryParams = []
@@ -996,7 +1043,7 @@ const searchEmployees = async (req, res) => {
         const { rows } = await pool.query(query, queryParams)
 
         if (rows.length === 0) {
-            return res.status(200).json('No employees found')
+            return res.status(200).json(rows)
         }
         res.status(200).json(rows)
 
@@ -1170,4 +1217,4 @@ async function insertData(req, res) {
 };
 
   
-  module.exports = { createEMP, updateEMP, deleteEMP, getAllEMPop, getEMP, emailValidation, Phonevalidations, updateEmployeeDetails, getAllEmployees, getEmployeeById, createDetails, fetchdata, fetchdataById, AddEmpDoc, FetchAllDocs, FetchDoc, putEmployee, employeeLogin, searchEmployees, insertData, getEMPByID, FetchAllDocsOnly, FetchDoconly, updateEMPStatus, updateProfile, GETProfileById, GETAllProfile, getAllOPEMPbyOPid }
+  module.exports = { createEMP, updateEMP, deleteEMP, getAllEMPop, getEMP, emailValidation, Phonevalidations, updateEmployeeDetails, getAllEmployees, getEmployeeById, createDetails, fetchdata, fetchdataById, AddEmpDoc, FetchAllDocs, FetchDoc, putEmployee, employeeLogin, searchEmployees, insertData, getEMPByID, FetchAllDocsOnly, FetchDoconly, updateEMPStatus, updateProfile, GETProfileById, GETAllProfile, getAllOPEMPbyOPid, getEmails, getPhones }

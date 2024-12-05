@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer');
 const path = require('path');
-const { postOperator, putOperatorPersonal, Emailvalidation, phoneValidation, deleteOperator, searchOperator, getOperator, Operator_business_details, Operator_detailsByID, getOperator_addressByID, getOperator_address, operator_details, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, getImg, getImgByID, ImportExcel, getEmail, getEmailByID } = require('../Controller/operator_controller');
+const { postOperator, putOperatorPersonal, Emailvalidation, phoneValidation, deleteOperator, searchOperator, getOperator, Operator_business_details, Operator_detailsByID, getOperator_addressByID, getOperator_address, operator_details, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, putOperatorProfileImg, getImg, getImgByID, ImportExcel, getEmail, getEmailByID, getEmails, getPhones } = require('../Controller/operator_controller');
 
 const oprouter = express.Router()
 
@@ -64,6 +64,8 @@ oprouter.put('/operator/:tbs_operator_id', operator_upload.single('profileimg'),
 oprouter.put('/operators-withAll-data/:tbs_operator_id', uploadFields, putOperator)
 oprouter.post('/operator_email-validation', Emailvalidation)
 oprouter.post('/operator_validation', phoneValidation)
+oprouter.post('/emailid', getEmails)
+oprouter.post('/phone', getPhones)
 oprouter.delete('/operators/:tbs_operator_id', deleteOperator)
 oprouter.get('/operators-search/:search_term', searchOperator)
 oprouter.get('/operators', getOperator)

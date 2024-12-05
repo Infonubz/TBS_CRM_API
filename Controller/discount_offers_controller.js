@@ -199,9 +199,6 @@ const updateOffer = async (req, res) => {
         const offerExists = await pool.query('SELECT * FROM discount_offers WHERE tbs_offer_id = $1', [tbs_offer_id]);
         if (offerExists.rows.length === 0) return res.status(404).json({ error: 'Offer not found' });
 
-        const statusIdValue = status_id ? parseInt(status_id, 10) : null;
-        const reqStatusIdValue = req_status_id ? parseInt(req_status_id, 10) : null;
-
         const result = await pool.query(
             `UPDATE discount_offers SET 
                 tbs_user_id = COALESCE($1, tbs_user_id), 
@@ -232,9 +229,9 @@ const updateOffer = async (req, res) => {
                 code,
                 start_date,
                 expiry_date,
-                usage,
+                usage ? parseInt(usage, 10) : null,
                 status,
-                statusIdValue, 
+                status_id ? parseInt(status_id, 10) : null,
                 offer_desc,
                 offerPicUrl,
                 image_size,
@@ -242,9 +239,9 @@ const updateOffer = async (req, res) => {
                 image_file,
                 occupation,
                 themeUrl,
-                occupation_id,
+                occupation_id ? parseInt(occupation_id, 10) : null,
                 req_status,
-                reqStatusIdValue, 
+                req_status_id ? parseInt(req_status_id, 10) : null,
                 offer_value,
                 value_symbol,
                 tbs_offer_id,
@@ -257,7 +254,6 @@ const updateOffer = async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }
-
 
 // OFFERS-DEALS DELETE CONTROLLER
 const deleteoffers = async (req, res) => {
@@ -517,14 +513,14 @@ const getOffersDealsByOccupation = async (req, res) => {
       if (occupation == 0) {
         query = `
           SELECT *
-          FROM discount_offers WHERE req_status_id = 3 ORDER BY GREATEST(created_date, updated_date) DESC;
+          FROM discount_offers WHERE req_status_id = 2 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [];
       } else {
         query = `
           SELECT *
           FROM discount_offers
-          WHERE req_status_id = 3 AND occupation_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
+          WHERE req_status_id = 2 AND occupation_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [occupation];
       }

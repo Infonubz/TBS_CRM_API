@@ -84,7 +84,7 @@ const restorePromo = async (req, res) => {
 
         const deletedData = recycleResult.rows[0].deleted_data;
 
-        const restoreQuery = `INSERT INTO promotions_tbl (promo_id, promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_id, user_status, promo_description, promo_image, created_date, background_image, tbs_user_id, updated_date, promo_img_details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING promo_id`;
+        const restoreQuery = `INSERT INTO promotions_tbl (promo_id, promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, user_status_id, user_status, promo_description, promo_image, created_date, background_image, tbs_user_id, updated_date, promo_img_details, promo_value, promo_code, value_symbol) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING promo_id`;
         
         const restoredPromo = await client.query(restoreQuery, [ deletedData.promo_id, 
             deletedData.promo_name,
@@ -94,7 +94,7 @@ const restorePromo = async (req, res) => {
             deletedData.usage,
             deletedData.promo_status_id,
             deletedData.promo_status,
-            deletedData.user_id,
+            deletedData.user_status_id,
             deletedData.user_status,
             deletedData.promo_description,
             deletedData.promo_image,
@@ -102,7 +102,8 @@ const restorePromo = async (req, res) => {
             deletedData.background_image,
             deletedData.tbs_user_id,
             deletedData.updated_date,
-            deletedData.promo_img_details
+            deletedData.promo_img_details,
+            deletedData.promo_value, deletedData.promo_code, deletedData.value_symbol
         ]);
 
         await client.query('DELETE FROM recycle_bin WHERE tbs_recycle_id = $1', [tbs_recycle_id]);
@@ -153,14 +154,14 @@ const restoreAd = async (req, res) => {
         const deletedData = recycleResult.rows[0].deleted_data;
 
         const restoredAd = await client.query(
-            `INSERT INTO advertisements_tbl (tbs_ad_id, client_details, ad_title, start_date, end_date, ad_description, usage_per_day, status, ad_video, ad_file_size, ad_file_type, created_date, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id, req_status, req_status_id, updated_date) 
+            `INSERT INTO advertisements_tbl (tbs_ad_id, client_details, ad_title, start_date, end_date, ad_description, usage_per_day, ads_status, ad_video, ad_file_size, ad_file_type, created_date, ads_status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id, ads_req_status, ads_req_status_id, updated_date) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) 
              RETURNING tbs_ad_id`, [ deletedData.tbs_ad_id, 
                 deletedData.client_details, deletedData.ad_title, deletedData.start_date, deletedData.end_date,
-                deletedData.ad_description, deletedData.usage_per_day, deletedData.status, deletedData.ad_video, deletedData.ad_file_size,
-                deletedData.ad_file_type, deletedData.created_date, deletedData.status_id, deletedData.tbs_client_id, deletedData.page_id,
+                deletedData.ad_description, deletedData.usage_per_day, deletedData.ads_status, deletedData.ad_video, deletedData.ad_file_size,
+                deletedData.ad_file_type, deletedData.created_date, deletedData.ads_status_id, deletedData.tbs_client_id, deletedData.page_id,
                 deletedData.page_name, deletedData.tbs_user_id, deletedData.hours, deletedData.duration, deletedData.ads_plan_id,
-                deletedData.req_status, deletedData.req_status_id, deletedData.updated_date])
+                deletedData.ads_req_status, deletedData.ads_req_status_id, deletedData.updated_date])
 
         await client.query('DELETE FROM recycle_bin WHERE tbs_recycle_id = $1', [tbs_recycle_id]);
 
@@ -209,14 +210,14 @@ const restoreMobAd = async (req, res) => {
         const deletedData = recycleResult.rows[0].deleted_data;
 
         const restoredAd = await client.query(
-            `INSERT INTO mobile_advertisements_tbl (tbs_mobad_id, client_details, mobad_title, start_date, end_date, mobad_description, usage_per_day, status, mobad_vdo, mobad_file_size, mobad_file_type, created_date, status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id, req_status, req_status_id, updated_date) 
+            `INSERT INTO mobile_advertisements_tbl (tbs_mobad_id, client_details, mobad_title, start_date, end_date, mobad_description, usage_per_day, ads_status, mobad_vdo, mobad_file_size, mobad_file_type, created_date, ads_status_id, tbs_client_id, page_id, page_name, tbs_user_id, hours, duration, ads_plan_id, ads_req_status, ads_req_status_id, updated_date) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23) RETURNING tbs_mobad_id`,
             [ deletedData.tbs_mobad_id, 
                 deletedData.client_details, deletedData.ad_title, deletedData.start_date, deletedData.end_date,
-                deletedData.ad_description, deletedData.usage_per_day, deletedData.status, deletedData.ad_video, deletedData.ad_file_size,
-                deletedData.ad_file_type, deletedData.created_date, deletedData.status_id, deletedData.tbs_client_id, deletedData.page_id,
+                deletedData.ad_description, deletedData.usage_per_day, deletedData.ads_status, deletedData.ad_video, deletedData.ad_file_size,
+                deletedData.ad_file_type, deletedData.created_date, deletedData.ads_status_id, deletedData.tbs_client_id, deletedData.page_id,
                 deletedData.page_name, deletedData.tbs_user_id, deletedData.hours, deletedData.duration, deletedData.ads_plan_id,
-                deletedData.req_status, deletedData.req_status_id, deletedData.updated_date
+                deletedData.ads_req_status, deletedData.ads_req_status_id, deletedData.updated_date
             ]
         );
 
@@ -346,7 +347,7 @@ const restoreOPEmployee = async (req, res) => {
 
         await client.query(
             `INSERT INTO op_emp_personal_details (
-                tbs_pro_emp_id, emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, 
+                tbs_op_emp_id, emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, blood_group, 
                 temp_add, temp_country, temp_state, temp_city, temp_zip_code, perm_add, perm_country, perm_state, perm_city, 
                 perm_zip_code, type_name, type_id, password, emp_status, emp_status_id, profile_img, tbs_operator_id
             ) 

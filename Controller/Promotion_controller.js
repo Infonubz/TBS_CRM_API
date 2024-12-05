@@ -93,6 +93,29 @@ const getPromobyStatus = async (req, res) => {
     }
 };
 
+//GET PROMOTION BY STATUS
+const getPromobyStatusUserid = async (req, res) => {
+    try {
+        const { tbs_user_id, user_status_id } = req.params;
+
+        let getPromoStatus;
+        let values;
+
+        if (user_status_id == 5) {
+            getPromoStatus = `SELECT * FROM promotions_tbl WHERE tbs_user_id = $1 ORDER BY created_date DESC`;
+            values = [tbs_user_id]; 
+        } else {
+            getPromoStatus = `SELECT * FROM promotions_tbl WHERE tbs_user_id = $1 AND user_status_id = $2 ORDER BY created_date DESC`;
+            values = [tbs_user_id, user_status_id];
+        }
+
+        const result = await pool.query(getPromoStatus, values);
+        res.status(200).send(result.rows);
+    } catch (err) {
+        console.error("Error getting records:", err.message);
+        res.status(500).json({ message: "Error getting records" });
+    }
+}
 
 
 //GET OPERATOR RECORDS FOR DROPDOWN
@@ -131,6 +154,7 @@ const deletePromo = async (req, res) => {
 
         // Prepare the deleted data object for the recycle bin
         const deletedData = {
+            promo_id: promo.promo_id,
             promo_name: promo.promo_name,
             operator_details: promo.operator_details,
             start_date: promo.start_date,
@@ -358,7 +382,7 @@ const postPromo = async (req, res) => {
 //UPDATE PROMOTION BY ID
 const putPromo = async (req, res) => {
     const ID = req.params.promo_id
-    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, tbs_user_id, promo_value, promo_code, value_symbol } = req.body
+    const { promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, tbs_user_id, promo_value, promo_code, user_status, user_status_id, value_symbol } = req.body
  
     if (req.file && req.file.size > 5 * 1024 * 1024) {
         return res.status(400).send('File size exceeded (Max: 5MB)')
@@ -368,26 +392,28 @@ const putPromo = async (req, res) => {
     const uploadPromobackImage = req.files && req.files['background_image'] ? `/promotion_files/${req.files['background_image'][0].filename}` : null
  
     const updatePromo = `
-    UPDATE promotions_tbl SET
-        promo_name = $1,
-        operator_details = $2,
-        start_date = $3,
-        expiry_date = $4,
-        usage = $5,
-        promo_status_id = $6,
-        promo_status = $7,
-        promo_description = $8,
-        promo_image = $9,
-        background_image = $10,
-        tbs_user_id = $11,
-        promo_value = $12,
-        promo_code = $13,
-        updated_date = NOW(), value_symbol = $14  
-    WHERE promo_id = $15
-    RETURNING *
-`;
+                    UPDATE promotions_tbl SET
+                    promo_name = COALESCE($1, promo_name),
+                    operator_details = COALESCE($2, operator_details),
+                    start_date = COALESCE($3, start_date),
+                    expiry_date = COALESCE($4, expiry_date),
+                    usage = COALESCE($5, usage),
+                    promo_status_id = COALESCE($6::INTEGER, promo_status_id),
+                    promo_status = COALESCE($7, promo_status),
+                    promo_description = COALESCE($8, promo_description),
+                    promo_image = COALESCE($9, promo_image),
+                    background_image = COALESCE($10, background_image),
+                    tbs_user_id = COALESCE($11, tbs_user_id),
+                    promo_value = COALESCE($12, promo_value),
+                    promo_code = COALESCE($13, promo_code),
+                    updated_date = NOW(),
+                    value_symbol = COALESCE($14, value_symbol),
+                    user_status = COALESCE($15, user_status),
+                    user_status_id = COALESCE($16::INTEGER, user_status_id)
+                WHERE promo_id = $17
+                RETURNING *; `;
 
-    const values = [promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, uploadPromoUrl, uploadPromobackImage, tbs_user_id, promo_value, promo_code, value_symbol, ID]
+    const values = [promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, uploadPromoUrl, uploadPromobackImage, tbs_user_id, promo_value, promo_code, value_symbol, user_status, user_status_id, ID]
  
     try {
         const result = await pool.query(updatePromo, values)
@@ -454,7 +480,7 @@ const putPromoStatus = async (req, res) => {
                        OR LOWER(operator_details) LIKE $1
                        OR (TO_CHAR(start_date, 'Mon') || ' ' || TO_CHAR(start_date, 'DD')) ILIKE $1
                        OR (TO_CHAR(expiry_date, 'Mon') || ' ' || TO_CHAR(expiry_date, 'DD')) ILIKE $1
-                       OR LOWER(promo_status) LIKE $1`;
+                       OR LOWER(promo_status) LIKE $1 `;
     
                 queryParams = [searchValue];
             } else {
@@ -683,4 +709,4 @@ const getLivePromotions = async (req, res) => {
 
     
 module.exports =  { getPromo, getPromobyId, deletePromo, postPromo, putPromo, 
-    searchPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById };
+    searchPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById, getPromobyStatusUserid };

@@ -5,6 +5,52 @@ const xlsx = require('xlsx')
 const fs = require('fs');
 const XLSX = require('xlsx');
 
+//check operator email exist or not
+const getEmails = async (req, res) => {
+    const { emailid } = req.body;
+
+    try {
+        if (!emailid) {
+            return res.status(400).json({ success: false, message: "Email ID is required" });
+        }
+
+        const emailQuery = `SELECT 1 FROM operators_tbl WHERE emailid = $1 LIMIT 1`;
+        const result = await pool.query(emailQuery, [emailid]);
+
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking email existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+}
+
+//check operator mobile exist or not
+const getPhones = async (req, res) => {
+    const { phone } = req.body;
+
+    try {
+        if (!phone) {
+            return res.status(400).json({ success: false, message: "Phone Number is required" });
+        }
+
+        const PhoneQuery = `SELECT 1 FROM operators_tbl WHERE phone = $1 LIMIT 1`;
+        const result = await pool.query(PhoneQuery, [phone]);
+
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking phone existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+}
+
 // operator_personal_details POST CONTROLLER
 const postOperator = async (req, res) => {
     const { company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id } = req.body
@@ -135,7 +181,6 @@ const deleteOperator = async (req, res) => {
             operatorDetails
         };
 
-        // Insert the combined data into recycle_bin
         const recycleInsertQuery = 'INSERT INTO recycle_bin (module_name, module_id, deleted_data, module_get_id) VALUES ($1, $2, $3, $4) RETURNING tbs_recycle_id';
         await client.query(recycleInsertQuery, ['operator', operatorId, JSON.stringify(deletedData), 5]);
 
@@ -1165,4 +1210,4 @@ const getEmailByID = async (req, res) => {
         } 
    }
 
-module.exports = { postOperator, putOperatorPersonal, deleteOperator, getOperator, Emailvalidation, phoneValidation, searchOperator, operator_details, getOperator_address, getOperator_addressByID, Operator_business_details, Operator_detailsByID, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, getImg, getImgByID, ImportExcel, getEmail, getEmailByID }
+module.exports = { postOperator, putOperatorPersonal, deleteOperator, getOperator, Emailvalidation, phoneValidation, searchOperator, operator_details, getOperator_address, getOperator_addressByID, Operator_business_details, Operator_detailsByID, getGST, getGSTByID, getDoc, getDocByID, getOperatorByID, putOperator, operatorLogin, getImg, getImgByID, ImportExcel, getEmail, getEmailByID, getEmails, getPhones }

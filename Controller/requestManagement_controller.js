@@ -535,8 +535,15 @@ const searchOffersDeals = async (req, res) => {
         }
 
         if (searchTerm) {
-            query += ` AND (LOWER(offer_name) LIKE $${paramIndex} OR LOWER(code) LIKE $${paramIndex})`;
-            queryParams.push(`%${searchTerm}%`);
+            query += ` AND (
+                LOWER(offer_name) LIKE $${paramIndex} OR 
+                LOWER(occupation) LIKE $${paramIndex} OR 
+                LOWER(code) LIKE $${paramIndex} OR 
+                LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $${paramIndex} OR 
+                LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $${paramIndex} OR
+                LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex}
+            )`;
+            queryParams.push(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`);
         }
 
         const { rows } = await pool.query(query, queryParams);
@@ -552,6 +559,7 @@ const searchOffersDeals = async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 };
+
 
 //PUT Controller for Updating Status
 const updateOfferDealStatus = async (req, res) => {
@@ -771,7 +779,7 @@ const searchDiscountOffersDeals = async (req, res) => {
 
         if (req_status_id) {
             if (req_status_id == 5) {
-                query += ` AND req_status_id IN (0,1, 2, 3, 4)`;
+                query += ` AND req_status_id IN (0, 1, 2, 3, 4)`;
             } else {
                 query += ` AND req_status_id = $${paramIndex}`;
                 queryParams.push(req_status_id);
@@ -780,7 +788,16 @@ const searchDiscountOffersDeals = async (req, res) => {
         }
 
         if (searchTerm) {
-            query += ` AND (LOWER(offer_name) LIKE $${paramIndex} OR LOWER(code) LIKE $${paramIndex})`;
+            query += `
+                AND (
+                    LOWER(offer_name) LIKE $${paramIndex} OR 
+                    LOWER(occupation) LIKE $${paramIndex} OR 
+                    LOWER(code) LIKE $${paramIndex} OR 
+                    LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $${paramIndex} OR 
+                    LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $${paramIndex} OR
+                    LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex}
+                )
+            `;
             queryParams.push(`%${searchTerm}%`);
         }
 

@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const { createEMP, updateEMP, deleteEMP, getEMP, getAllEMP, emailValidation, Phonevalidations, getAllEmployees, getEmployeeById, updateEmployeeDetails, putEmployee, createDetails, fetchdataById, fetchdata, AddEmpDoc, FetchDoc, FetchAllDocs, employeeLogin, searchEmployees, insertData, getEMPByID, FetchDoconly, FetchAllDocsOnly, updateEMPStatus, getAllEMPop, updateProfile, GETAllProfile, GETProfileById, getAllOPEMPbyOPid } = require('../Controller/op_emp_controller');
+const { createEMP, updateEMP, deleteEMP, getEMP, getAllEMP, emailValidation, Phonevalidations, getAllEmployees, getEmployeeById, updateEmployeeDetails, putEmployee, createDetails, fetchdataById, fetchdata, AddEmpDoc, FetchDoc, FetchAllDocs, employeeLogin, searchEmployees, insertData, getEMPByID, FetchDoconly, FetchAllDocsOnly, updateEMPStatus, getAllEMPop, updateProfile, GETAllProfile, GETProfileById, getAllOPEMPbyOPid, getEmails, getPhones } = require('../Controller/op_emp_controller');
 
 const emprouter = express.Router()
 
@@ -61,6 +61,8 @@ emprouter.get('/All-emp-details/:tbs_operator_id', getAllOPEMPbyOPid)
 emprouter.post('/employee_email-validation', emailValidation)
 emprouter.post('/employee_Phone-validation', Phonevalidations)
 emprouter.post('/employee-login', employeeLogin)
+emprouter.post('/emailid-opEmp', getEmails)
+emprouter.post('/phone-opEmp', getPhones)
     //EMPLOYEE REGISTERED ADDRESS
 emprouter.get('/emp-registered-address', getAllEmployees)
 emprouter.get('/emp-registered-address/:tbs_op_emp_id', getEmployeeById)
@@ -98,7 +100,7 @@ emprouter.get('/emp-professional-documents/:tbs_op_emp_id', FetchDoc)
 emprouter.get('/emp-professional-documents', FetchAllDocs)
 emprouter.get('/emp-documents-only/:tbs_op_emp_id', FetchDoconly)
 emprouter.get('/emp-documents-only', FetchAllDocsOnly)
-emprouter.get('/employee-search/:search_term', searchEmployees)
+emprouter.get('/employee-search/:tbs_operator_id/:search_term', searchEmployees)
 emprouter.post('/employee-importExcel', emp_excelupload.single('xlsxFile'), insertData)
 emprouter.put('/emp-status/:tbs_op_emp_id', updateEMPStatus)
 emprouter.get('/emp-profileImg', GETAllProfile)

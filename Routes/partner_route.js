@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const { createPartner, updatePartner, deletePartner, getPartner, getPartnerByID, FetchAllDocuments, FetchDocumentByID, AddPartnerDoc, getPartnerAddressById, getAllPartners, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, updatePartnerDetails, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, updatePartnerProfile, phoneVal, importPartnerDetails } = require('../Controller/partner_controller');
+const { createPartner, updatePartner, deletePartner, getPartner, getPartnerByID, FetchAllDocuments, FetchDocumentByID, AddPartnerDoc, getPartnerAddressById, getAllPartners, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, updatePartnerDetails, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, phoneVal, importPartnerDetails, getEmails, getPhones } = require('../Controller/partner_controller');
 
 const patrouter = express.Router()
 
@@ -61,6 +61,8 @@ patrouter.get('/partner_address_details', getAllPartners)
 patrouter.get('/partner_address_details/:tbs_partner_id', getPartnerAddressById)
 patrouter.post('/partner_phone-validation', phoneVal)
 patrouter.post('/partner-login', partnerLogin)
+patrouter.post('/emailid-partner', getEmails)
+patrouter.post('/phone-partner', getPhones)
 patrouter.get('/partner_ProfileImg/:tbs_partner_id', GetPartnerProfileById)
 patrouter.get('/partner_ProfileImg', GetAllPartnerProfile)
 //partner-document-details

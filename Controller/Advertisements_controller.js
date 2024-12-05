@@ -261,6 +261,7 @@ const deleteAd = async (req, res) => {
         const ad = adResult.rows[0];
 
         const deletedData = {
+            tbs_ad_id: ad.tbs_ad_id,
             client_details: ad.client_details,
             ad_title: ad.ad_title,
             start_date: ad.start_date,

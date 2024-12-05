@@ -1,6 +1,52 @@
 const pool = require('../config/db')
 const xlsx = require('xlsx')
 
+//check client email exist or not
+const getEmails = async (req, res) => {
+    const { emailid } = req.body;
+  
+    try {
+        if (!emailid) {
+            return res.status(400).json({ success: false, message: "Email ID is required" });
+        }
+  
+        const emailQuery = `SELECT 1 FROM client_company_details WHERE emailid = $1 LIMIT 1`;
+        const result = await pool.query(emailQuery, [emailid]);
+  
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking email existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+  }
+  
+  //check client mobile exist or not
+  const getPhones = async (req, res) => {
+    const { phone } = req.body;
+  
+    try {
+        if (!phone) {
+            return res.status(400).json({ success: false, message: "Phone Number is required" });
+        }
+  
+        const PhoneQuery = `SELECT 1 FROM client_company_details WHERE phone = $1 LIMIT 1`;
+        const result = await pool.query(PhoneQuery, [phone]);
+  
+        if (result.rows.length > 0) {
+            return res.status(200).json({ exists: true });
+        } else {
+            return res.status(200).json({ exists: false });
+        }
+    } catch (error) {
+        console.error("Error checking phone existence:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
+    }
+  }
+
 // CLIENT COMPANY details POST CONTROLLER
 const postClient = async (req, res) => {
     const { company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, req_status, req_status_id } = req.body
@@ -505,4 +551,4 @@ const ExcelUpload = async (req, res) => {
     }
 }
 
-module.exports = { postClient, deleteClient, getClientcompany, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, getClientDetails, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById }
+module.exports = { postClient, deleteClient, getClientcompany, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, getClientDetails, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById, getEmails, getPhones }

@@ -3,6 +3,53 @@ const jwt = require('jsonwebtoken')
 const xlsx = require('xlsx');
 const moment = require('moment');
 
+
+//check partner email exist or not
+const getEmails = async (req, res) => {
+  const { emailid } = req.body;
+
+  try {
+      if (!emailid) {
+          return res.status(400).json({ success: false, message: "Email ID is required" });
+      }
+
+      const emailQuery = `SELECT 1 FROM partner_details WHERE emailid = $1 LIMIT 1`;
+      const result = await pool.query(emailQuery, [emailid]);
+
+      if (result.rows.length > 0) {
+          return res.status(200).json({ exists: true });
+      } else {
+          return res.status(200).json({ exists: false });
+      }
+  } catch (error) {
+      console.error("Error checking email existence:", error);
+      return res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+}
+
+//check partner mobile exist or not
+const getPhones = async (req, res) => {
+  const { phone } = req.body;
+
+  try {
+      if (!phone) {
+          return res.status(400).json({ success: false, message: "Phone Number is required" });
+      }
+
+      const PhoneQuery = `SELECT 1 FROM partner_details WHERE phone = $1 LIMIT 1`;
+      const result = await pool.query(PhoneQuery, [phone]);
+
+      if (result.rows.length > 0) {
+          return res.status(200).json({ exists: true });
+      } else {
+          return res.status(200).json({ exists: false });
+      }
+  } catch (error) {
+      console.error("Error checking phone existence:", error);
+      return res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+}
+
 // partner details POST CONTROLLER
 const createPartner = async (req, res) => {
   const {
@@ -745,4 +792,4 @@ const importPartnerDetails = async (req, res) => {
 };
 
   
-  module.exports = { createPartner, updatePartner, deletePartner, getPartnerByID, getPartner, Emailval, phoneVal, AddPartnerDoc, FetchAllDocuments, FetchDocumentByID, updatePartnerDetails, getAllPartners, getPartnerAddressById, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, importPartnerDetails }
+  module.exports = { createPartner, updatePartner, deletePartner, getPartnerByID, getPartner, Emailval, phoneVal, AddPartnerDoc, FetchAllDocuments, FetchDocumentByID, updatePartnerDetails, getAllPartners, getPartnerAddressById, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, importPartnerDetails, getEmails, getPhones }

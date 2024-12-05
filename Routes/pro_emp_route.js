@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path');
-const { createEMPpro, updateEMPpro, deleteEMPpro, getEMPpro, getEMPByIDpro, getAllEMPpro, emailValidationpro, Phonevalidationspro, employeeLoginpro, getAllEmployeespro, getEmployeeByIdpro, updateEmployeeDetailspro, putEmployeepro, createDetailspro, fetchdataByIdpro, fetchdatapro, AddEmpDocpro, FetchDocpro, FetchAllDocspro, FetchDoconlypro, FetchAllDocsOnlypro, searchEmployeespro, insertDatapro, updateEMPStatusPro, GETProfilepro, GETAllProfilepro } = require('../Controller/pro_emp_controller');
+const { createEMPpro, updateEMPpro, deleteEMPpro, getEMPpro, getEMPByIDpro, getAllEMPpro, emailValidationpro, Phonevalidationspro, employeeLoginpro, getAllEmployeespro, getEmployeeByIdpro, updateEmployeeDetailspro, putEmployeepro, createDetailspro, fetchdataByIdpro, fetchdatapro, AddEmpDocpro, FetchDocpro, FetchAllDocspro, FetchDoconlypro, FetchAllDocsOnlypro, searchEmployeespro, insertDatapro, updateEMPStatusPro, GETProfilepro, GETAllProfilepro, getEmails, getPhones } = require('../Controller/pro_emp_controller');
 
 
 const proemprouter = express.Router()
@@ -61,6 +61,8 @@ proemprouter.get('/pro-All-emp-details', getAllEMPpro)
 proemprouter.post('/pro-employee_email-validation', emailValidationpro)
 proemprouter.post('/pro-employee_Phone-validation', Phonevalidationspro)
 proemprouter.post('/pro-employee-login', employeeLoginpro)
+proemprouter.post('/emailid-poEmp', getEmails)
+proemprouter.post('/phone-poEmp', getPhones)
     //EMPLOYEE REGISTERED ADDRESS
 proemprouter.get('/pro-emp-registered-address', getAllEmployeespro)
 proemprouter.get('/pro-emp-registered-address/:tbs_pro_emp_id', getEmployeeByIdpro)

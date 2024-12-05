@@ -432,14 +432,14 @@ const getOffersDealsByOccupation = async (req, res) => {
       if (occupation == 0) {
         query = `
           SELECT *
-          FROM redeem_offers WHERE req_status_id = 3 ORDER BY GREATEST(created_date, updated_date) DESC;
+          FROM redeem_offers WHERE req_status_id = 2 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [];
       } else {
         query = `
           SELECT *
           FROM redeem_offers
-          WHERE req_status_id = 3 AND occupation_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
+          WHERE req_status_id = 2 AND occupation_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [occupation];
       }
