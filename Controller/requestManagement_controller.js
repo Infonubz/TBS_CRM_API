@@ -396,7 +396,7 @@ const getOffersDeals = async (req, res) => {
         const query = `
         SELECT *
         FROM redeem_offers
-        WHERE req_status_id IN (0,1, 2, 3, 4)
+        WHERE req_status_id IN (0,1, 2, 3, 4) ORDER BY GREATEST(created_date, updated_date) DESC
         `;
         const result = await pool.query(query);
 
@@ -447,14 +447,14 @@ const getOffersDealsByStatus = async (req, res) => {
         query = `
         SELECT *
         FROM redeem_offers
-        WHERE req_status_id IN (0,1, 2, 3, 4)
+        WHERE req_status_id IN (0,1, 2, 3, 4) ORDER BY GREATEST(created_date, updated_date) DESC
         `;
         params = [];
       } else {
         query = `
           SELECT *
           FROM redeem_offers
-          WHERE req_status_id = $1;
+          WHERE req_status_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [reqStatus];
       }
@@ -478,12 +478,12 @@ const filterOffersDealsByDate = async (req, res) => {
 
         query = `
             SELECT *
-            FROM redeem_offers `;
+            FROM redeem_offers ORDER BY GREATEST(created_date, updated_date) DESC `;
         
         const conditions = [];
        
         if (from && to) {
-            conditions.push(`created_date BETWEEN $1 AND $2::DATE + INTERVAL '1 day' - INTERVAL '1 second'`);
+            conditions.push(`created_date BETWEEN $1 AND $2::DATE + INTERVAL '1 day' - INTERVAL '1 second' ORDER BY GREATEST(created_date, updated_date) DESC`);
             queryParams.push(from, to);
         }
 
@@ -519,14 +519,14 @@ const searchOffersDeals = async (req, res) => {
         let query = `
             SELECT *
             FROM redeem_offers
-            WHERE 1=1
+            WHERE 1=1 
         `;
         let queryParams = [];
         let paramIndex = 1;
 
         if (req_status_id) {
             if (req_status_id == 5) {
-                query += ` AND req_status_id IN (0, 1, 2, 3, 4)`;
+                query += ` AND req_status_id IN (0, 1, 2, 3, 4) `;
             } else {
                 query += ` AND req_status_id = $${paramIndex}`;
                 queryParams.push(req_status_id);
@@ -541,9 +541,9 @@ const searchOffersDeals = async (req, res) => {
                 LOWER(code) LIKE $${paramIndex} OR 
                 LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $${paramIndex} OR 
                 LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $${paramIndex} OR
-                LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex}
-            )`;
-            queryParams.push(`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`);
+                LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex} 
+            ) `;
+            queryParams.push(`%${searchTerm}%`);
         }
 
         const { rows } = await pool.query(query, queryParams);
@@ -649,7 +649,7 @@ const getDiscountOffersDeals = async (req, res) => {
         const query = `
         SELECT *
         FROM discount_offers
-        WHERE req_status_id IN (0, 1, 2, 3, 4)
+        WHERE req_status_id IN (0, 1, 2, 3, 4) ORDER BY GREATEST(created_date, updated_date) DESC
         `;
         const result = await pool.query(query);
 
@@ -700,14 +700,14 @@ const getDiscountOffersDealsByStatus = async (req, res) => {
         query = `
         SELECT *
         FROM discount_offers
-        WHERE req_status_id IN (0, 1, 2, 3, 4)
+        WHERE req_status_id IN (0, 1, 2, 3, 4) ORDER BY GREATEST(created_date, updated_date) DESC
         `;
         params = [];
       } else {
         query = `
           SELECT *
           FROM discount_offers
-          WHERE req_status_id = $1;
+          WHERE req_status_id = $1 ORDER BY GREATEST(created_date, updated_date) DESC;
         `;
         params = [reqStatus];
       }
@@ -731,20 +731,20 @@ const filterDiscountOffersDealsByDate = async (req, res) => {
 
         query = `
             SELECT *
-            FROM discount_offers `;
+            FROM discount_offers ORDER BY GREATEST(created_date, updated_date) DESC `;
         
         const conditions = [];
        
         if (from && to) {
-            conditions.push(`created_date BETWEEN $1 AND $2::DATE + INTERVAL '1 day' - INTERVAL '1 second'`);
+            conditions.push(`created_date BETWEEN $1 AND $2::DATE + INTERVAL '1 day' - INTERVAL '1 second' ORDER BY GREATEST(created_date, updated_date) DESC`);
             queryParams.push(from, to);
         }
 
         if (req_status_id !== undefined) {
             if (req_status_id === 5) {
-                conditions.push(`req_status_id IN (0, 1, 2, 3, 4)`);
+                conditions.push(`req_status_id IN (0, 1, 2, 3, 4) ORDER BY GREATEST(created_date, updated_date) DESC`);
             } else {
-                conditions.push(`req_status_id = $${queryParams.length + 1}`);
+                conditions.push(`req_status_id = $${queryParams.length + 1} ORDER BY GREATEST(created_date, updated_date) DESC`);
                 queryParams.push(req_status_id);
             }
         }
@@ -779,7 +779,7 @@ const searchDiscountOffersDeals = async (req, res) => {
 
         if (req_status_id) {
             if (req_status_id == 5) {
-                query += ` AND req_status_id IN (0, 1, 2, 3, 4)`;
+                query += ` AND req_status_id IN (0, 1, 2, 3, 4) `;
             } else {
                 query += ` AND req_status_id = $${paramIndex}`;
                 queryParams.push(req_status_id);

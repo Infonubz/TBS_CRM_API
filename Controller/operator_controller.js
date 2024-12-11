@@ -8,15 +8,17 @@ const XLSX = require('xlsx');
 //check operator email exist or not
 const getEmails = async (req, res) => {
     const { emailid } = req.body;
-
+  
     try {
         if (!emailid) {
             return res.status(400).json({ success: false, message: "Email ID is required" });
         }
-
-        const emailQuery = `SELECT 1 FROM operators_tbl WHERE emailid = $1 LIMIT 1`;
-        const result = await pool.query(emailQuery, [emailid]);
-
+  
+        const emailLowerCase = emailid.toLowerCase();
+  
+        const emailQuery = `SELECT 1 FROM operators_tbl WHERE LOWER(emailid) = $1 LIMIT 1`;
+        const result = await pool.query(emailQuery, [emailLowerCase]);
+  
         if (result.rows.length > 0) {
             return res.status(200).json({ exists: true });
         } else {
@@ -26,7 +28,7 @@ const getEmails = async (req, res) => {
         console.error("Error checking email existence:", error);
         return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
-}
+  }
 
 //check operator mobile exist or not
 const getPhones = async (req, res) => {
@@ -274,7 +276,7 @@ try {
 
 // search CONTROLLER
 const searchOperator = async (req, res) => {
-    const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : ''
+    const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : '';
 
     try {
         let query;
@@ -284,28 +286,25 @@ const searchOperator = async (req, res) => {
             query = `
             SELECT *
             FROM operators_tbl AS o
-            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id 
-                WHERE LOWER(company_name) LIKE $1
-                    OR LOWER(owner_name) LIKE $1
-                    OR phone::text LIKE $1
-                    OR LOWER(emailid) LIKE $1
-                    OR LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $1
+            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id  
+            WHERE LOWER(o.company_name) LIKE $1
+                OR LOWER(o.owner_name) LIKE $1
+                OR LOWER(od.business_background) LIKE $1
+                OR LOWER(o.tbs_operator_id::text) LIKE $1
+                OR o.phone::text LIKE $1
+                OR LOWER(o.emailid) LIKE $1
+                OR LOWER(TO_CHAR(o.created_date, 'Mon DD')) LIKE $1;
             `;
             queryParams = [`%${searchTerm}%`];
         } else {
-            query = `SELECT *
+            query = `
+            SELECT *
             FROM operators_tbl AS o
-            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id;
-            `;
+            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id  `;
             queryParams = [];
         }
 
         const { rows } = await pool.query(query, queryParams);
-        
-        if (rows.length === 0) {
-
-            return res.status(200).json(rows);
-        }
 
         res.status(200).json(rows);
 
@@ -313,7 +312,7 @@ const searchOperator = async (req, res) => {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-}
+};
 
 //operator_details POST CONTROLLERS
 const operator_details = async (req, res) => {
@@ -984,7 +983,7 @@ const operatorLogin = async (req, res) => {
         const token = jwt.sign({ operatorId }, process.env.JWT_SECRET_KEY, { expiresIn: '1w' });
 
         res.json({
-            id: operatorId,
+            id: operatorId, 
             company_name: companyName,
             owner_name: ownerName,
             type_name: typeName,
@@ -1090,12 +1089,23 @@ const ImportExcel = async (req, res) => {
                 row.created_date = excelSerialToDate(row.created_date);
             }
 
+            row.emailid = row.emailid ? row.emailid.toLowerCase() : null;
+
             const {
                 company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
-                aadharcard_number, pancard_number, created_date, user_status, req_status,
-                user_status_id, req_status_id, type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code, address, state, region, city, country, zip_code, has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
+                aadharcard_number, pancard_number, created_date, type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code, address, state, region, city, country, zip_code, has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
                 head_office, state_id, country_id, city_id
             } = row;
+
+            const existingEntry = await pool.query(
+                `SELECT * FROM operators_tbl WHERE LOWER(emailid) = $1 OR phone = $2`,
+                [emailid, phone]
+            );
+
+            if (existingEntry.rowCount > 0) {
+                row.emailid = null;
+                row.phone = null;
+            }
 
             const operatorResult = await pool.query(
                 `INSERT INTO operators_tbl (
@@ -1104,9 +1114,9 @@ const ImportExcel = async (req, res) => {
                     user_status_id, req_status_id, type_name, type_id, password
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
                 RETURNING tbs_operator_id`,
-                [company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
-                aadharcard_number, pancard_number, created_date, user_status, req_status,
-                user_status_id, req_status_id, 'OPERATOR', 'OP101', ''] 
+                [company_name, owner_name, row.phone, alternate_phone, row.emailid, alternate_emailid,
+                aadharcard_number, pancard_number, created_date, 'Draft', 'Draft',
+                0, 0, 'OPERATOR', 'OP101', ''] 
             );
 
             const tbs_operator_id = operatorResult.rows[0].tbs_operator_id;

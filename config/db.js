@@ -9,7 +9,7 @@ const pool = new Pool({
     password: process.env.PASSWORD,
     max: 100,  
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000
+    connectionTimeoutMillis: 20000
 });
 
 module.exports = pool;

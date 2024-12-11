@@ -5,40 +5,41 @@ const pool = require('../config/db');
 const getAllRecords = async (req, res) => {
     try {
         const query = `
-                        SELECT 
-                                o.profileimg,
-                                o.tbs_operator_id, 
-                                o.company_name, 
-                                o.owner_name, 
-                                o.phone, 
-                                o.emailid, 
-                                o.created_date,
-                                od.gstin,
-                                od.type_of_constitution, 
-                                od.business_background, 
-                                s.plan_name, 
-                                s.plan_type,
-                                s.generate_key 
-                            FROM 
-                                operators_tbl o
-                            LEFT JOIN 
-                                operator_details od 
-                            ON 
-                                o.tbs_operator_id = od.tbs_operator_id
-                            LEFT JOIN 
-                                (
-                                    SELECT 
-                                        tbs_operator_id, plan_name, plan_type, generate_key,
-                                        ROW_NUMBER() OVER(PARTITION BY tbs_operator_id ORDER BY created_date DESC) as row_num
-                                    FROM 
-                                        subscriptions_tbl
-                                ) s 
-                            ON 
-                                o.tbs_operator_id = s.tbs_operator_id AND s.row_num = 1
-                            WHERE 
-                                o.user_status_id = 1 
-                            ORDER BY 
-                                o.created_date DESC; `;  
+            SELECT 
+                o.profileimg,
+                o.tbs_operator_id, 
+                o.company_name, 
+                o.owner_name, 
+                o.phone, 
+                o.emailid, 
+                o.created_date,
+                od.gstin,
+                od.type_of_constitution, 
+                od.business_background, 
+                s.plan_name, 
+                s.plan_type,
+                s.generate_key 
+            FROM 
+                operators_tbl o
+            LEFT JOIN 
+                operator_details od 
+            ON 
+                o.tbs_operator_id = od.tbs_operator_id
+            LEFT JOIN 
+                (
+                    SELECT 
+                        tbs_operator_id, plan_name, plan_type, generate_key,
+                        ROW_NUMBER() OVER(PARTITION BY tbs_operator_id ORDER BY created_date DESC) as row_num
+                    FROM 
+                        subscriptions_tbl
+                ) s 
+            ON 
+                o.tbs_operator_id = s.tbs_operator_id AND s.row_num = 1
+            WHERE 
+                o.user_status_id = 2 
+                AND (o.generate_key IS NOT NULL OR s.generate_key IS NOT NULL)
+            ORDER BY 
+                o.created_date DESC;`;
       
         const { rows } = await pool.query(query);
 

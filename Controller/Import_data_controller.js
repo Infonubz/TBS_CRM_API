@@ -72,24 +72,34 @@ const sheetUpload = async (req, res) => {
 const postData = (req, res) => {
     const { field_id, select_fields } = req.body
 
-    // Check if file upload exceeded size limit
     if (req.file && req.file.size > 5 * 1024 * 1024) {
         return res.status(400).send('File size exceeded (Max: 5MB)')
     }
 
-    // Check if uploaded file mimetype is allowed
-    if (!req.file || !['image/jpeg', 'image/jpg', 'image/png', 'video/mp4', 'application/pdf', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(req.file.mimetype)) {
-        return res.status(400).send('Only .jpeg, .jpg, .png, .mp4, .pdf, .xls, and .xlsx files are allowed')
+    if (!req.file || !['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(req.file.mimetype)) {
+        return res.status(400).send('Only .xlsx files are allowed')
     }
     
     const uploadFileUrl = `/imp_files/${req.file.filename}`
+
+    const file_details = req.file ? {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        encoding: req.file.encoding,
+        type: req.file.mimetype,
+        destination: req.file.destination,
+        filename: req.file.filename,
+        path: req.file.path,
+        size: req.file.size
+    } : null;
+
 
     if ( !field_id || !select_fields || !uploadFileUrl) {
         return res.status(400).send("Invalid request body")
     }
 
-    const insertData = `INSERT INTO import_data ( field_id, select_fields, upload_files) VALUES ($1, $2, $3)`
-    const values = [field_id, select_fields, uploadFileUrl]
+    const insertData = `INSERT INTO import_data ( field_id, select_fields, upload_files, file_details) VALUES ($1, $2, $3, $4)`
+    const values = [field_id, select_fields, uploadFileUrl, file_details]
 
     pool.query(insertData, values, (err, result) => {
         if (err) {
@@ -116,16 +126,27 @@ const putData = (req, res) => {
     
     const uploadFileUrl = `/imp_files/${req.file.filename}`
 
+    const file_details = req.file ? {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        encoding: req.file.encoding,
+        type: req.file.mimetype,
+        destination: req.file.destination,
+        filename: req.file.filename,
+        path: req.file.path,
+        size: req.file.size
+    } : null;
+
     if (!field_id || !select_fields || !uploadFileUrl) {
-        return res.status(400).send("Invalid request body")
+        return res.status(400).send("Invalid request body") 
     }
 
     const updateData = `UPDATE import_data 
     SET field_id = $1,
     select_fields = $2,
-    upload_files = $3, updated_date = now() 
-    WHERE imp_id = $4`
-    const values = [field_id, select_fields, uploadFileUrl, ID]
+    upload_files = $3, updated_date = now() , file_details = $4
+    WHERE imp_id = $5`
+    const values = [field_id, select_fields, uploadFileUrl, file_details, ID]
 
     pool.query(updateData, values, (err, result) => {
         if (err) {

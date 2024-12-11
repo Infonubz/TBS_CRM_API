@@ -79,19 +79,29 @@ const getPromobyStatus = async (req, res) => {
         let values;
 
         if (id === 5) {
-            getPromoStatus = `SELECT * FROM promotions_tbl ORDER BY created_date DESC`;
+            getPromoStatus = `SELECT * 
+            FROM promotions_tbl 
+            WHERE (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id = 5)
+               OR tbs_user_id NOT LIKE 'tbs-op_emp%' 
+            ORDER BY created_date DESC;`;
+        } else if (id === 1) {
+            getPromoStatus = `SELECT * 
+            FROM promotions_tbl 
+            WHERE (tbs_user_id LIKE 'tbs-op_emp%' AND user_status_id = 1) AND (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id = 5)
+            OR tbs_user_id NOT LIKE 'tbs-op_emp%'  AND user_status_id = 1 
+            ORDER BY created_date DESC;`;
         } else {
             getPromoStatus = `SELECT * FROM promotions_tbl WHERE user_status_id = $1 ORDER BY created_date DESC`;
             values = [id];
         }
 
-        const result = await pool.query(getPromoStatus, values);
+        const result = await pool.query(getPromoStatus, values || []);
         res.status(200).send(result.rows);
     } catch (err) {
-        console.log(err.message);
-        res.status(500).json({message: "Error getting records"});
+        console.error(err.message);
+        res.status(500).json({ message: "Error getting records" });
     }
-};
+}
 
 //GET PROMOTION BY STATUS
 const getPromobyStatusUserid = async (req, res) => {
@@ -117,6 +127,49 @@ const getPromobyStatusUserid = async (req, res) => {
     }
 }
 
+//GET PROMOTION BY STATUS FOR OP EMP
+const getPromosByStatusAndUserId = async (req, res) => {
+    try {
+        const { tbs_user_id, user_status_id } = req.params;
+
+        if (!tbs_user_id || !user_status_id) {
+            return res.status(400).json({ message: "tbs_user_id and user_status_id are required." });
+        }
+
+        const operatorQuery = `SELECT tbs_op_emp_id FROM op_emp_personal_details WHERE tbs_operator_id = $1`;
+        const operatorResult = await pool.query(operatorQuery, [tbs_user_id]);
+
+        if (operatorResult.rows.length === 0) {
+            return res.status(404).json({ message: "No operator employees found for this user." });
+        }
+
+        const tbs_op_emp_ids = operatorResult.rows.map(row => row.tbs_op_emp_id);
+
+        let promotionsQuery;
+        let values;
+
+        if (user_status_id == 5) {
+           
+            promotionsQuery = `SELECT * FROM promotions_tbl WHERE tbs_user_id = ANY($1::text[]) AND promo_status_id != 0 ORDER BY created_date DESC`;
+            values = [tbs_op_emp_ids];
+        } else {
+           
+            promotionsQuery = `SELECT * FROM promotions_tbl WHERE tbs_user_id = ANY($1::text[]) AND user_status_id = $2 ORDER BY created_date DESC`;
+            values = [tbs_op_emp_ids, user_status_id];
+        }
+
+        const promotionsResult = await pool.query(promotionsQuery, values);
+
+        if (promotionsResult.rows.length === 0) {
+            return res.status(200).json(promotionsResult.rows);
+        }
+
+        res.status(200).json(promotionsResult.rows);
+    } catch (err) {
+        console.error("Error fetching promotions:", err.message);
+        res.status(500).json({ message: "Error fetching promotions" });
+    }
+}
 
 //GET OPERATOR RECORDS FOR DROPDOWN
 const getOperatorRecords = async (req, res) => {
@@ -138,10 +191,8 @@ const deletePromo = async (req, res) => {
     try {
         const promo_id = req.params.promo_id;
 
-        // Start a transaction
         await client.query('BEGIN');
 
-        // Fetch the promotion from the database
         const fetchPromoQuery = 'SELECT * FROM promotions_tbl WHERE promo_id = $1';
         const fetchPromoResult = await client.query(fetchPromoQuery, [promo_id]);
 
@@ -152,7 +203,6 @@ const deletePromo = async (req, res) => {
             return res.status(201).json({message : `Promotion with ID ${promo_id} not found`});
         }
 
-        // Prepare the deleted data object for the recycle bin
         const deletedData = {
             promo_id: promo.promo_id,
             promo_name: promo.promo_name,
@@ -175,23 +225,19 @@ const deletePromo = async (req, res) => {
             promo_code: promo.promo_code
         };
 
-        // Insert the deleted promotion data into the recycle bin
         const insertRecycleBinQuery = `
             INSERT INTO recycle_bin (module_name, module_id, deleted_data, module_get_id)
             VALUES ($1, $2, $3, $4)
         `;
         await client.query(insertRecycleBinQuery, ['promotions', promo_id, JSON.stringify(deletedData), 2]);
 
-        // Delete the promotion from the promotions_tbl
         const removePromoQuery = 'DELETE FROM promotions_tbl WHERE promo_id = $1';
         const result = await client.query(removePromoQuery, [promo_id]);
 
         if (result.rowCount === 1) {
             const tbs_user_id = promo.tbs_user_id;
 
-            // Update the respective user's table based on the tbs_user_id
             if (tbs_user_id.startsWith('tbs-pro')) {
-                // For product_owner
                 await client.query(
                     `UPDATE product_owner_tbl 
                      SET promotions = array_remove(promotions, $1) 
@@ -199,7 +245,6 @@ const deletePromo = async (req, res) => {
                     [promo_id, tbs_user_id]
                 );
             } else if (tbs_user_id.startsWith('tbs-op_emp')) {
-                // For operator_employee
                 await client.query(
                     `UPDATE op_emp_personal_details 
                      SET promotions = array_remove(promotions, $1) 
@@ -207,7 +252,6 @@ const deletePromo = async (req, res) => {
                     [promo_id, tbs_user_id]
                 );
             } else if (tbs_user_id.startsWith('tbs-op')) {
-                // For operator
                 await client.query(
                     `UPDATE operators_tbl 
                      SET promotions = array_remove(promotions, $1) 
@@ -216,7 +260,6 @@ const deletePromo = async (req, res) => {
                 );
             }
 
-            // Commit the transaction
             await client.query('COMMIT');
             res.status(200).json({ message : 'Promotion deleted successfully and moved to recycle bin'});
         } else {
@@ -231,8 +274,7 @@ const deletePromo = async (req, res) => {
     } finally {
         client.release();
     }
-};
-
+}
  
 //POST PROMOTION
 const postPromo = async (req, res) => {
@@ -433,22 +475,23 @@ const putPromo = async (req, res) => {
 const putPromoStatus = async (req, res) => {
     try {
         const ID = req.params.promo_id
-        const { promo_status_id, promo_status, user_status_id, user_status } = req.body
+        const { promo_status_id, promo_status, user_status_id, user_status, comments } = req.body
  
         if (!ID || !promo_status_id || !promo_status || !user_status_id || !user_status) {
             return res.status(400).json("Invalid request body")
         }
  
         const updatePromoStatus = `
-            UPDATE promotions_tbl SET
-                promo_status_id = $1,
-                promo_status = $2,
-                user_status_id = $3,
-                user_status = $4
-            WHERE promo_id = $5
-            RETURNING *
-        `
-        const values = [promo_status_id, promo_status, user_status_id, user_status, ID]
+        UPDATE promotions_tbl
+        SET
+            promo_status_id = COALESCE($1, promo_status_id),
+            promo_status = COALESCE($2, promo_status),
+            user_status_id = COALESCE($3, user_status_id),
+            user_status = COALESCE($4, user_status),
+            comments = COALESCE($5, comments)
+        WHERE promo_id = $6
+        RETURNING *; `
+        const values = [promo_status_id, promo_status, user_status_id, user_status, comments, ID]
         const result = await pool.query(updatePromoStatus, values)
  
         if (result.rowCount === 0) {
@@ -582,7 +625,7 @@ const promoFilterByDate = async (req, res) => {
                 return res.status(400).send('no file uploaded.');
             }
     
-            const { tbs_user_id } = req.body;
+            const { tbs_user_id } = req.body
     
             if (!tbs_user_id) {
                 return res.status(400).send('tbs_user_id is required.');
@@ -593,8 +636,9 @@ const promoFilterByDate = async (req, res) => {
             const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
     
             const requiredColumns = [
-                'promo_name', 'operator_details', 'start_date', 'expiry_date', 'usage', 'promo_description'
+                'promo_name', 'start_date', 'expiry_date', 'usage', 'promo_code', 'promo_value', 'value_symbol', 'promo_description'
             ];
+
     
             const excelDateToJSDate = (serial) => {
                 const excelEpoch = new Date(Date.UTC(1899, 11, 30));
@@ -621,7 +665,7 @@ const promoFilterByDate = async (req, res) => {
                 } else if (userId.startsWith('tbs-op_emp')) {
                     query = `SELECT emp_status_id FROM op_emp_personal_details WHERE tbs_pro_emp_id = $1`;
                 } else if (userId.startsWith('tbs-pro')) {
-                    query = `SELECT 1 FROM product_owner WHERE tbs_product_owner_id = $1`;
+                    query = `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`;
                 } else {
                     return false; 
                 }
@@ -644,7 +688,7 @@ const promoFilterByDate = async (req, res) => {
             }
     
             for (let i = 0; i < data.length; i++) {
-                let { promo_name, operator_details, start_date, expiry_date, usage, promo_description, promo_value, value_symbol } = data[i];
+                let { promo_name, start_date, expiry_date, usage, promo_code, promo_value, value_symbol, promo_description } = data[i];
     
                 if (!validateRow(data[i])) {
                     return res.status(400).send(`Row with missing or invalid data: ${JSON.stringify(data[i])}`);
@@ -655,9 +699,9 @@ const promoFilterByDate = async (req, res) => {
     
                 const query = {
                     text: `INSERT INTO promotions_tbl (
-                        promo_name, operator_details, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, promo_value, value_symbol, tbs_user_id
+                        promo_name, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, promo_value, value_symbol, promo_code, tbs_user_id
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-                    values: [promo_name, operator_details, start_date, expiry_date, usage, '0', 'pending', promo_description, promo_value, value_symbol, tbs_user_id],
+                    values: [promo_name, start_date, expiry_date, usage, '0', 'Draft', promo_description, promo_value, value_symbol, promo_code, tbs_user_id],
                 };
     
                 await pool.query(query);
@@ -709,4 +753,4 @@ const getLivePromotions = async (req, res) => {
 
     
 module.exports =  { getPromo, getPromobyId, deletePromo, postPromo, putPromo, 
-    searchPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById, getPromobyStatusUserid };
+    searchPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById, getPromobyStatusUserid, getPromosByStatusAndUserId };

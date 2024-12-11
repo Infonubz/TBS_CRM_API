@@ -13,8 +13,10 @@ const getEmails = async (req, res) => {
           return res.status(400).json({ success: false, message: "Email ID is required" });
       }
 
-      const emailQuery = `SELECT 1 FROM partner_details WHERE emailid = $1 LIMIT 1`;
-      const result = await pool.query(emailQuery, [emailid]);
+      const emailLowerCase = emailid.toLowerCase();
+
+      const emailQuery = `SELECT 1 FROM partner_details WHERE LOWER(emailid) = $1 LIMIT 1`;
+      const result = await pool.query(emailQuery, [emailLowerCase]);
 
       if (result.rows.length > 0) {
           return res.status(200).json({ exists: true });
@@ -719,21 +721,42 @@ const importPartnerDetails = async (req, res) => {
   try {
     await pool.query('BEGIN');
 
-    for (const row of excelData) {
+    const existingDataQuery = `
+      SELECT LOWER(emailid) AS emailid, phone
+      FROM partner_details`;
+    const existingDataResult = await pool.query(existingDataQuery);
+    const existingEmails = new Set(existingDataResult.rows.map(row => row.emailid));
+    const existingPhones = new Set(existingDataResult.rows.map(row => row.phone));
+
+    const flaggedData = excelData.map(row => {
+      const emailLower = row.emailid ? row.emailid.toLowerCase() : null;
+      const isDuplicateEmail = existingEmails.has(emailLower);
+      const isDuplicatePhone = existingPhones.has(row.phone);
+
+      return {
+        ...row,
+        emailid: isDuplicateEmail ? null : row.emailid,
+        phone: isDuplicatePhone ? null : row.phone,
+      };
+    });
+
+    for (const row of flaggedData) {
       const {
         partner_first_name, partner_last_name, phone, emailid,
         alternate_phone, date_of_birth, gender,
-        temp_add, temp_country, temp_state, temp_city, temp_zip_code,
-        perm_add, perm_country, perm_state, perm_city, perm_zip_code,
-        type_name = 'PARTNER',
-        type_id = 'PART101',
-        partner_status = 'Draft',
-        partner_status_id = 0,
-        req_status = null,
-        req_status_id = null,
+        temp_add, temp_country, temp_state, temp_city, temp_region, temp_zip_code,
+        perm_add, perm_country, perm_state, perm_city, perm_region, perm_zip_code,
+        occupation, occupation_id
       } = row;
 
-      if (!partner_first_name || !partner_last_name || !phone || !emailid || !date_of_birth || !gender) {
+      const type_name = 'PARTNER';
+      const type_id = 'PART101';
+      const partner_status = 'Draft';
+      const partner_status_id = 0;
+      const req_status = 'Draft';
+      const req_status_id = 0;
+
+      if (!partner_first_name || !partner_last_name || !date_of_birth || !gender) {
         return res.status(400).json({ error: 'Missing required fields in Excel data' });
       }
 
@@ -747,16 +770,15 @@ const importPartnerDetails = async (req, res) => {
           partner_first_name, partner_last_name, phone, emailid, alternate_phone,
           date_of_birth, gender, type_name, type_id, partner_status,
           partner_status_id, req_status, req_status_id, temp_add, temp_country,
-          temp_state, temp_city, temp_zip_code, perm_add, perm_country,
-          perm_state, perm_city, perm_zip_code
+          temp_state, temp_city, temp_region, temp_zip_code, perm_add, perm_country,
+          perm_state, perm_city, perm_region, perm_zip_code, occupation, occupation_id
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
         RETURNING tbs_partner_id;`,
         [
           partner_first_name, partner_last_name, phone, emailid, alternate_phone,
           formattedDOB, gender, type_name, type_id, partner_status, partner_status_id,
-          req_status, req_status_id, temp_add, temp_country, temp_state, temp_city, temp_zip_code,
-          perm_add, perm_country, perm_state, perm_city, perm_zip_code
+          req_status, req_status_id, temp_add, temp_country, temp_state, temp_city, temp_region, temp_zip_code, perm_add, perm_country, perm_state, perm_city, perm_region, perm_zip_code, occupation, occupation_id
         ]
       );
 
@@ -768,18 +790,15 @@ const importPartnerDetails = async (req, res) => {
         [password, tbs_partner_id]
       );
 
-      // Assuming the aadhar_card_number and pan_card_number are part of the Excel row
       const { aadhar_card_number, pan_card_number } = row;
 
       const documentInsertQuery = `
         UPDATE partner_documents
         SET aadhar_card_number = $2, pan_card_number = $3
-        WHERE tbs_partner_id = $1;
-      `;
+        WHERE tbs_partner_id = $1; `;
       const documentInsertValues = [tbs_partner_id, aadhar_card_number, pan_card_number];
 
       await pool.query(documentInsertQuery, documentInsertValues);
-
     }
 
     await pool.query('COMMIT');
@@ -789,7 +808,6 @@ const importPartnerDetails = async (req, res) => {
     console.error('Error inserting into database:', err);
     res.status(500).json({ error: 'Database insertion failed' });
   }
-};
-
+}
   
   module.exports = { createPartner, updatePartner, deletePartner, getPartnerByID, getPartner, Emailval, phoneVal, AddPartnerDoc, FetchAllDocuments, FetchDocumentByID, updatePartnerDetails, getAllPartners, getPartnerAddressById, partnerLogin, FetchAllDocumentDetails, FetchDocumentDetailsByID, GetPartnerProfileById, GetAllPartnerProfile, updatePartnerStatus, importPartnerDetails, getEmails, getPhones }

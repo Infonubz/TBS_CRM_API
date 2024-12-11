@@ -273,7 +273,7 @@ const deleteoffers = async (req, res) => {
 // OFFERS-DEALS GET CONTROLLER
 const getOffers = async (req,res)=>{
     try {
-        const result =await pool.query('SELECT * FROM redeem_offers ORDER BY created_date DESC ')
+        const result =await pool.query('SELECT * FROM redeem_offers ORDER BY GREATEST(created_date, updated_date) DESC ')
         res.status(200).json(result.rows)
     } catch (error) {
         console.log('Error',error)
@@ -345,23 +345,62 @@ const excelDateToJSDate = (serial) => {
 
 const ImportExcel = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(201).send('No file uploaded.');
+        if (!req.file || !req.file.path) {
+            return res.status(400).send('No file uploaded.');
+        }
+
+        const { tbs_user_id } = req.body;
+        if (!tbs_user_id) return res.status(400).send('tbs_user_id is required.');
+
+        const validateUserId = async (userId) => {
+            if (!['tbs-pro', 'tbs-pro_emp'].some(prefix => userId.startsWith(prefix))) return false;
+            const query = userId.startsWith('tbs-pro') 
+                ? `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1` 
+                : `SELECT 1 FROM op_emp_personal_details WHERE tbs_pro_emp_id = $1`;
+            const result = await pool.query(query, [userId]);
+            return result.rows.length > 0;
+        };
+
+        if (!(await validateUserId(tbs_user_id))) {
+            return res.status(400).send('Invalid tbs_user_id. Access denied.');
         }
 
         const workbook = xlsx.readFile(req.file.path);
-        const sheet_name_list = workbook.SheetNames;
-        const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
+        const data = xlsx.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
-        for (let i = 0; i < data.length; i++) {
-            let { tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id } = data[i];
+        const parseDate = (date) => {
+            if (!date) return null;
+            if (!isNaN(date)) {
+                const serialDate = new Date(Date.UTC(1899, 11, 30) + (date - 1) * 864e5);
+                return isNaN(serialDate) ? null : serialDate.toISOString().split('T')[0];
+            }
+            const isoDate = new Date(date);
+            return isNaN(isoDate) ? null : isoDate.toISOString().split('T')[0];
+        };
 
-            start_date = excelDateToJSDate(start_date);
-            expiry_date = excelDateToJSDate(expiry_date);
+        for (const row of data) {
+            const {
+                offer_name, code, start_date, expiry_date, usage, offer_desc,
+                occupation, occupation_id
+            } = row;
+
+            const parsedStartDate = parseDate(start_date);
+            const parsedExpiryDate = parseDate(expiry_date);
+
+            if (!parsedStartDate || !parsedExpiryDate) {
+                console.error(`Invalid date in row: ${JSON.stringify(row)}`);
+                continue; 
+            }
 
             const query = {
-                text: `INSERT INTO redeem_offers (tbs_user_id,offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-                values: [tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, offer_desc, occupation, occupation_id, req_status, req_status_id],
+                text: `INSERT INTO redeem_offers (
+                    tbs_user_id, offer_name, code, start_date, expiry_date, usage, status, status_id, 
+                    offer_desc, occupation, occupation_id, req_status, req_status_id
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+                values: [
+                    tbs_user_id, offer_name, code, parsedStartDate, parsedExpiryDate, usage, 'Draft', 
+                    0, offer_desc, occupation, occupation_id, 'Draft', 0
+                ]
             };
 
             await pool.query(query);
@@ -369,10 +408,10 @@ const ImportExcel = async (req, res) => {
 
         res.status(200).send('File uploaded and data saved successfully.');
     } catch (error) {
-        console.error('Error processing file:', error);
-        res.status(201).send('Error processing file.');
+        console.error('Error processing file:', error.message || error);
+        res.status(500).send('Error processing file.');
     }
-};
+}
 
 // OFFERS-DEALS GET CONTROLLER
 const getOfferImg = async (req,res)=>{
@@ -411,7 +450,7 @@ const getRecentOffers = async (req, res) => {
     try {
         const getRecentOffersQuery = `
             SELECT * FROM redeem_offers WHERE offer_img != 'null' 
-            ORDER BY created_date DESC 
+            ORDER BY GREATEST(created_date, updated_date) DESC 
             LIMIT 6`;
         const result = await pool.query(getRecentOffersQuery);
         res.status(200).send(result.rows);
@@ -455,13 +494,31 @@ const getOffersDealsByOccupation = async (req, res) => {
 
 //GET LIVE OFFERS AND DEALS
 const getLiveOffersDeals = async (req, res) => {
+    const occupation = req.params.occupation_id;
+  
     try {
-      const result = await pool.query(
-        `SELECT *
-         FROM redeem_offers
-         WHERE NOW() BETWEEN start_date AND expiry_date
-         AND status_id = 1 ORDER BY GREATEST(created_date, updated_date) DESC;`
-      );
+      let query;
+      let params;
+  
+      if (occupation == 0) {
+        query = `
+          SELECT *
+          FROM redeem_offers
+          WHERE status_id = 2 AND (NOW() >= start_date OR NOW() <= expiry_date)
+          ORDER BY GREATEST(created_date, updated_date) DESC;
+        `;
+        params = [];
+      } else {
+        query = `
+          SELECT *
+          FROM redeem_offers
+          WHERE status_id = 2 AND occupation_id = $1 AND (NOW() >= start_date OR NOW() <= expiry_date)
+          ORDER BY GREATEST(created_date, updated_date) DESC;
+        `;
+        params = [occupation];
+      }
+  
+      const result = await pool.query(query, params);
   
       if (result.rows.length > 0) {
         res.status(200).json(result.rows);
@@ -470,8 +527,9 @@ const getLiveOffersDeals = async (req, res) => {
       }
     } catch (err) {
       console.error('Error executing query:', err);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ error: 'Internal Server Error' });
     }
-  }
+  };
+  
 
 module.exports = { postOffer, updateOffer, deleteoffers, getOffers, getOffersByID, searchOffers, ImportExcel, getOfferImg, getOffer_ImgByID, getOffersBytbsID, getActiveOffers, getRecentOffers, getOffersDealsByOccupation, getLiveOffersDeals }

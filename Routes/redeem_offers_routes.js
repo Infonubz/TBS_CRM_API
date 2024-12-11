@@ -62,6 +62,6 @@ redeemoffrouter.get('/redeem-offers-deal/:tbs_operator_id', getOffersBytbsID)
 redeemoffrouter.get('/redeem-offers-deals-search/:search_term', searchOffers);
 redeemoffrouter.get('/redeem-recentOffers', getRecentOffers);
 redeemoffrouter.get('/redeem-offers-deals-occupation/:occupation_id', getOffersDealsByOccupation)
-redeemoffrouter.get('/getLiveRedeemOffersDeals', getLiveOffersDeals)
+redeemoffrouter.get('/getLiveRedeemOffersDeals/:occupation_id', getLiveOffersDeals)
 
 module.exports = { redeemoffrouter }

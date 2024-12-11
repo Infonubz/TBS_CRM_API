@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const xlsx = require('xlsx')
 const path = require('path');
-const { getPromo, getPromobyId, postPromo, deletePromo, searchPromo, putPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById, getPromobyStatusUserid } = require('../Controller/Promotion_controller');
+const { getPromo, getPromobyId, postPromo, deletePromo, searchPromo, putPromo, sheetUpload, getPromobyStatus, putPromoStatus, getOperatorRecords, promoFilterByDate, getRecentPromos, getLivePromotions, getPromoByUserId, searchPromoById, getPromobyStatusUserid, getPromosByStatusAndUserId } = require('../Controller/Promotion_controller');
 
 const promotionsRouter = express.Router();
 
@@ -66,12 +66,13 @@ promotionsRouter.post('/promo/importxlsx', (req, res, next) => {
 
 promotionsRouter.get('/promo-status/:user_status_id', getPromobyStatus);
 promotionsRouter.get('/promo-status-userid/:tbs_user_id/:user_status_id', getPromobyStatusUserid);
+promotionsRouter.get('/promo-status-empuserid/:tbs_user_id/:user_status_id', getPromosByStatusAndUserId);
 promotionsRouter.put('/promo-statusId/:promo_id', putPromoStatus);
 promotionsRouter.get('/promo/search/:searchTerm', searchPromo);
 promotionsRouter.get('/promo-operatorDetails', getOperatorRecords);
 promotionsRouter.post('/promo/filter', promoFilterByDate);
 promotionsRouter.get('/recentPromos', getRecentPromos);
 promotionsRouter.get('/getLivePromotions', getLivePromotions)
-promotionsRouter.get('/promo/searchPromoById/:tbs_user_id', searchPromoById)
+promotionsRouter.post('/promo/searchPromoById/:tbs_user_id', searchPromoById)
 
 module.exports = { promotionsRouter };

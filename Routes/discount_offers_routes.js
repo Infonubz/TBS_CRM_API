@@ -62,6 +62,6 @@ offrouter.get('/offers-deal/:tbs_operator_id', getOffersBytbsID)
 offrouter.get('/offers-deals-search/:search_term', searchOffers);
 offrouter.get('/recentOffers', getRecentOffers);
 offrouter.get('/offers-deals-occupation/:occupation_id', getOffersDealsByOccupation)
-offrouter.get('/getLiveOffersDeals', getLiveOffersDeals)
+offrouter.get('/getLiveOffersDeals/:occupation_id', getLiveOffersDeals)
 
 module.exports = { offrouter }
