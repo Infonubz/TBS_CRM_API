@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path');
-const { postClient, ClientProfileImg, deleteClient, getClient, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, getClientDetails, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById, getClientcompany, getEmails, getPhones } = require('../Controller/client_controller');
+const { postClient, deleteClient, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById, getClientcompany, getEmails, getPhones } = require('../Controller/client_controller');
 
 const cltrouter = express.Router()
 
@@ -68,7 +68,6 @@ cltrouter.delete('/client-gst/:tbs_client_id', deleteClientGst)
 cltrouter.get('/client-gst/:tbs_client_id', getGstByid)
 cltrouter.get('/client-gsts', getAllGst)
 
-cltrouter.get('/All-client-details', getClientDetails);
 cltrouter.put('/client-company-details/:tbs_client_id', putClientCompanyDetails)
 
 cltrouter.post('/upload', client_excelupload.single('file'), ExcelUpload)

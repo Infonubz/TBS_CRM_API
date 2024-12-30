@@ -406,8 +406,8 @@ const searchMobAdvertisements = async (req, res) => {
                     a.tbs_user_id = $1 AND (
                         LOWER(a.client_details) LIKE $2 OR
                         LOWER(a.mobad_title) LIKE $2 OR
-                        (TO_CHAR(a.start_date, 'Mon') || ' ' || TO_CHAR(a.start_date, 'DD')) ILIKE $2 OR
-                        (TO_CHAR(a.end_date, 'Mon') || ' ' || TO_CHAR(a.end_date, 'DD')) ILIKE $2 OR
+                        (TO_CHAR(a.start_date, 'DD') || ' ' || TO_CHAR(a.start_date, 'Mon')) ILIKE $2 OR
+                        (TO_CHAR(a.end_date, 'DD') || ' ' || TO_CHAR(a.end_date, 'Mon')) ILIKE $2 OR
                         LOWER(a.ads_status) LIKE $2 OR
                         LOWER(c.web_url) LIKE $2 OR
                         LOWER(c.emailid) LIKE $2 OR

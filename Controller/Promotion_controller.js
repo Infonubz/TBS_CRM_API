@@ -80,11 +80,17 @@ const getPromobyStatus = async (req, res) => {
 
         if (id === 5) {
             getPromoStatus = `SELECT * 
-            FROM promotions_tbl 
-            WHERE (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id = 5)
-               OR tbs_user_id NOT LIKE 'tbs-op_emp%' 
-            ORDER BY created_date DESC;`;
-        } else if (id === 1) {
+            FROM promotions_tbl
+            WHERE (
+                (tbs_user_id LIKE 'tbs-op%' AND promo_status_id NOT IN (1, 0)) 
+                OR 
+                (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id NOT IN (1, 0))
+                OR 
+                (tbs_user_id NOT LIKE 'tbs-op%' AND tbs_user_id NOT LIKE 'tbs-op_emp%')
+            )
+            ORDER BY created_date DESC; `;
+        }
+       else if (id === 1) {
             getPromoStatus = `SELECT * 
             FROM promotions_tbl 
             WHERE (tbs_user_id LIKE 'tbs-op_emp%' AND user_status_id = 1) AND (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id = 5)
@@ -521,8 +527,11 @@ const putPromoStatus = async (req, res) => {
                     FROM promotions_tbl
                     WHERE LOWER(promo_name) LIKE $1
                        OR LOWER(operator_details) LIKE $1
-                       OR (TO_CHAR(start_date, 'Mon') || ' ' || TO_CHAR(start_date, 'DD')) ILIKE $1
-                       OR (TO_CHAR(expiry_date, 'Mon') || ' ' || TO_CHAR(expiry_date, 'DD')) ILIKE $1
+                       OR LOWER(promo_code) LIKE $1
+                       OR LOWER(value_symbol) LIKE $1
+                       OR CAST(promo_value AS TEXT) LIKE $1
+                       OR (TO_CHAR(start_date, 'DD') || ' ' || TO_CHAR(start_date, 'Mon')) ILIKE $1
+                       OR (TO_CHAR(expiry_date, 'DD') || ' ' || TO_CHAR(expiry_date, 'Mon')) ILIKE $1
                        OR LOWER(promo_status) LIKE $1 `;
     
                 queryParams = [searchValue];
@@ -543,46 +552,72 @@ const putPromoStatus = async (req, res) => {
  //SEARCH PROMOTION BY NAME, CODE, DATE AND STATUS
  const searchPromoById = async (req, res) => {
     try {
+        let userStatusId = parseInt(req.params.user_status_id);
+        const tbsUserId = req.params.tbs_user_id;
+        const { searchTerm } = req.body;
+
         let query;
         let queryParams = [];
 
-        const { searchTerm } = req.body;
-        const { tbs_user_id } = req.params;
+        console.log(userStatusId);
 
-        if (tbs_user_id && searchTerm && typeof searchTerm === 'string') {
-            const searchValue = `%${searchTerm.toLowerCase()}%`;
-
+        if (userStatusId === 5) {
             query = `
-                SELECT *
+                SELECT * 
                 FROM promotions_tbl
-                WHERE tbs_user_id = $1
-                  AND (
-                        LOWER(promo_name) LIKE $2
-                     OR LOWER(operator_details) LIKE $2
-                     OR (TO_CHAR(start_date, 'Mon') || ' ' || TO_CHAR(start_date, 'DD')) ILIKE $2
-                     OR (TO_CHAR(expiry_date, 'Mon') || ' ' || TO_CHAR(expiry_date, 'DD')) ILIKE $2
-                     OR LOWER(promo_status) LIKE $2)`;
-
-            queryParams = [tbs_user_id, searchValue];
-        } else if (tbs_user_id) {
-
+                WHERE (
+                    (tbs_user_id LIKE 'tbs-op%' AND promo_status_id NOT IN (1, 0)) 
+                    OR 
+                    (tbs_user_id LIKE 'tbs-op_emp%' AND promo_status_id NOT IN (1, 0))
+                    OR 
+                    (tbs_user_id NOT LIKE 'tbs-op%' AND tbs_user_id NOT LIKE 'tbs-op_emp%')
+                )`;
+        } else if (userStatusId === 1) {
             query = `
-                SELECT *
-                FROM promotions_tbl
-                WHERE tbs_user_id = $1`;
-
-            queryParams = [tbs_user_id];
+                SELECT * 
+                FROM promotions_tbl 
+                WHERE (
+                    (tbs_user_id LIKE 'tbs-op_emp%' AND user_status_id = 1 AND promo_status_id = 5)
+                    OR 
+                    (tbs_user_id NOT LIKE 'tbs-op_emp%' AND user_status_id = 1)
+                )`;
         } else {
             query = `
-                SELECT *
-                FROM promotions_tbl`;
+                SELECT * 
+                FROM promotions_tbl 
+                WHERE user_status_id = $1`;
+            queryParams.push(userStatusId);
         }
 
+        if (tbsUserId) {
+            query += ` AND tbs_user_id = $${queryParams.length + 1}`;
+            queryParams.push(tbsUserId);
+        }
+
+        if (searchTerm && typeof searchTerm === 'string') {
+            const searchValue = `%${searchTerm.toLowerCase()}%`;
+            query += `
+                AND (
+                    LOWER(promo_name) LIKE $${queryParams.length + 1}
+                    OR LOWER(operator_details) LIKE $${queryParams.length + 1}
+                    OR LOWER(promo_status) LIKE $${queryParams.length + 1}
+                    OR LOWER(promo_code) LIKE $${queryParams.length + 1}
+                    OR LOWER(value_symbol) LIKE $${queryParams.length + 1}
+                    OR CAST(promo_value AS TEXT) LIKE $${queryParams.length + 1}
+                    OR (TO_CHAR(start_date, 'DD') || ' ' || TO_CHAR(start_date, 'Mon')) ILIKE $${queryParams.length + 1}
+                    OR (TO_CHAR(expiry_date, 'DD') || ' ' || TO_CHAR(expiry_date, 'Mon')) ILIKE $${queryParams.length + 1}
+                    OR LOWER(promo_status) LIKE $${queryParams.length + 1}
+                )`;
+            queryParams.push(searchValue);
+        }
+
+        query += ` ORDER BY created_date DESC`;
+
         const result = await pool.query(query, queryParams);
-        res.json(result.rows);
+        res.status(200).json(result.rows);
     } catch (err) {
         console.error('Error executing query', err);
-        res.status(501).json({ message: "Error searching records" });
+        res.status(500).json({ message: "Error retrieving records" });
     }
 }
 
@@ -619,13 +654,13 @@ const promoFilterByDate = async (req, res) => {
         }
     }
   
-    const sheetUpload = async (req, res) => {
-        try {
+const sheetUpload = async (req, res) => {
+    try {
             if (!req.file || !req.file.path) {
-                return res.status(400).send('no file uploaded.');
+                return res.status(400).send('No file uploaded.');
             }
     
-            const { tbs_user_id } = req.body
+            const { tbs_user_id } = req.body;
     
             if (!tbs_user_id) {
                 return res.status(400).send('tbs_user_id is required.');
@@ -638,7 +673,6 @@ const promoFilterByDate = async (req, res) => {
             const requiredColumns = [
                 'promo_name', 'start_date', 'expiry_date', 'usage', 'promo_code', 'promo_value', 'value_symbol', 'promo_description'
             ];
-
     
             const excelDateToJSDate = (serial) => {
                 const excelEpoch = new Date(Date.UTC(1899, 11, 30));
@@ -657,32 +691,46 @@ const promoFilterByDate = async (req, res) => {
             };
     
             const validateUserId = async (userId) => {
-                let query;
-                let result;
-    
-                if (userId.startsWith('tbs-op')) {
-                    query = `SELECT user_status_id FROM operators_tbl WHERE tbs_operator_id = $1`;
-                } else if (userId.startsWith('tbs-op_emp')) {
-                    query = `SELECT emp_status_id FROM op_emp_personal_details WHERE tbs_pro_emp_id = $1`;
-                } else if (userId.startsWith('tbs-pro')) {
-                    query = `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`;
-                } else {
-                    return false; 
+                try {
+                    let query = null;
+                    let result = null;
+            
+                    if (userId.startsWith('tbs-op') && !userId.startsWith('tbs-op_emp')) {
+                        console.log(`Validating operator user: ${userId}`);
+                        query = `SELECT user_status_id FROM operators_tbl WHERE tbs_operator_id = $1`;
+                    } else if (userId.startsWith('tbs-op_emp')) {
+                        console.log(`Validating operator employee: ${userId}`);
+                        query = `SELECT emp_status_id FROM op_emp_personal_details WHERE tbs_op_emp_id = $1`;
+                    } else if (userId.startsWith('tbs-pro')) {
+                        console.log(`Validating product owner: ${userId}`);
+                        query = `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`;
+                    } else {
+                        console.log(`Invalid user prefix: ${userId}`);
+                        return false;
+                    }
+            
+                    console.log('Executing query:', query, 'with userId:', userId);
+                    result = await pool.query(query, [userId]);
+                    console.log('Query result:', result.rows);
+            
+                    if (userId.startsWith('tbs-op') && !userId.startsWith('tbs-op_emp')) {
+                        return result.rows.length > 0 && result.rows[0].user_status_id === 2; 
+                    } else if (userId.startsWith('tbs-op_emp')) {
+                        return result.rows.length > 0 && result.rows[0].emp_status_id === 1; 
+                    } else if (userId.startsWith('tbs-pro')) {
+                        return result.rows.length > 0; 
+                    }
+            
+                    return false;
+                } catch (err) {
+                    console.error('Error validating user ID:', err);
+                    return false;
                 }
-    
-                result = await pool.query(query, [userId]);
-    
-                if (userId.startsWith('tbs-op')) {
-                    return result.rows.length > 0 && result.rows[0].user_status_id === 1;
-                } else if (userId.startsWith('tbs-op_emp')) {
-                    return result.rows.length > 0 && result.rows[0].emp_status_id === 1;
-                } else if (userId.startsWith('tbs-pro')) {
-                    return result.rows.length > 0; 
-                }
-                return false; 
-            };
+            }                                    
     
             const isValidUser = await validateUserId(tbs_user_id);
+            console.log('isValidUser:', isValidUser);
+            
             if (!isValidUser) {
                 return res.status(400).send('Invalid user. Promotion upload is not allowed.');
             }
@@ -699,11 +747,10 @@ const promoFilterByDate = async (req, res) => {
     
                 const query = {
                     text: `INSERT INTO promotions_tbl (
-                        promo_name, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, promo_value, value_symbol, promo_code, tbs_user_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
-                    values: [promo_name, start_date, expiry_date, usage, '0', 'Draft', promo_description, promo_value, value_symbol, promo_code, tbs_user_id],
-                };
-    
+                        promo_name, start_date, expiry_date, usage, promo_status_id, promo_status, promo_description, promo_value, value_symbol, promo_code, tbs_user_id, user_status, user_status_id ) 
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+                    values: [promo_name, start_date, expiry_date, usage, '0', 'Draft', promo_description, promo_value, value_symbol, promo_code, tbs_user_id, 'Draft', 0],
+                }
                 await pool.query(query);
             }
     
@@ -712,8 +759,7 @@ const promoFilterByDate = async (req, res) => {
             console.error('Error processing file:', error);
             res.status(500).send('Error processing file.');
         }
-    }
-      
+    }        
     
 // GET RECENTLY ADDED PROMOTIONS
 const getRecentPromos = async (req, res) => {
@@ -736,7 +782,7 @@ const getLivePromotions = async (req, res) => {
       const result = await pool.query(
         `SELECT *
          FROM promotions_tbl
-         WHERE NOW() >= start_date OR NOW() <= expiry_date
+         WHERE promo_status_id = 2 AND NOW() >= start_date OR NOW() <= expiry_date
          AND promo_status_id = 2 ORDER BY created_date DESC`
       );
   

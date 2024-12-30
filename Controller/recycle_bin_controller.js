@@ -270,12 +270,12 @@ const restoreOperator = async (req, res) => {
         const operatorDetails = deletedData.operatorDetails;
 
         await client.query(
-            `INSERT INTO operators_tbl (tbs_operator_id, company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id, password, profileimg, generate_key) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+            `INSERT INTO operators_tbl (tbs_operator_id, company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id, password, profileimg, generate_key, tbs_user_id) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
             [
                 operator.tbs_operator_id, operator.company_name, operator.owner_name, operator.phone, operator.alternate_phone, operator.emailid, operator.alternate_emailid, operator.aadharcard_number,
                 operator.pancard_number, operator.user_status, operator.req_status, operator.user_status_id, operator.req_status_id, operator.type_name, operator.type_id,
-                operator.password, operator.profileimg, operator.generate_key
+                operator.password, operator.profileimg, operator.generate_key, operator.tbs_user_id
             ]
         );
 
@@ -568,8 +568,8 @@ const restorePartner = async (req, res) => {
         const insertPartnerResult = await client.query(
             `INSERT INTO partner_details (tbs_partner_id, partner_first_name, partner_last_name, phone, emailid, alternate_phone, date_of_birth, gender, joining_date, 
                 type_name, type_id, temp_add, temp_country, temp_state, temp_city, temp_zip_code, perm_add, perm_country, 
-                perm_state, perm_city, perm_zip_code, password, profile_img, partner_status, partner_status_id, req_status, req_status_id) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+                perm_state, perm_city, perm_zip_code, password, profile_img, partner_status, partner_status_id, req_status, req_status_id, tbs_user_id) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
              RETURNING tbs_partner_id`,
             [   partnerDetails.tbs_partner_id, 
                 partnerDetails.partner_first_name, partnerDetails.partner_last_name, partnerDetails.phone, partnerDetails.emailid, partnerDetails.alternate_phone,
@@ -577,7 +577,7 @@ const restorePartner = async (req, res) => {
                 partnerDetails.temp_add, partnerDetails.temp_country, partnerDetails.temp_state, partnerDetails.temp_city, partnerDetails.temp_zip_code,
                 partnerDetails.perm_add, partnerDetails.perm_country, partnerDetails.perm_state, partnerDetails.perm_city, partnerDetails.perm_zip_code,
                 partnerDetails.password, partnerDetails.profile_img, partnerDetails.partner_status, partnerDetails.partner_status_id,
-                partnerDetails.req_status, partnerDetails.req_status_id
+                partnerDetails.req_status, partnerDetails.req_status_id, partnerDetails.tbs_user_id
             ]
         );
 
@@ -652,13 +652,13 @@ const restoreClient = async (req, res) => {
         
         await client.query(
             `INSERT INTO client_company_details (tbs_client_id, company_logo, company_name, owner_name, phone, emailid, type_of_constitution, 
-                business_background, web_url, type_name, type_id, password, status, status_id) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                business_background, web_url, type_name, type_id, password, status, status_id, tbs_user_id) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
             [
                 clientCompanyDetails.tbs_client_id, clientCompanyDetails.company_logo, clientCompanyDetails.company_name, clientCompanyDetails.owner_name,
                 clientCompanyDetails.phone, clientCompanyDetails.emailid, clientCompanyDetails.type_of_constitution, clientCompanyDetails.business_background,
                 clientCompanyDetails.web_url, clientCompanyDetails.type_name, clientCompanyDetails.type_id, clientCompanyDetails.password,
-                clientCompanyDetails.status, clientCompanyDetails.status_id
+                clientCompanyDetails.status, clientCompanyDetails.status_id, clientCompanyDetails.tbs_user_id
             ]
         );
 
@@ -732,7 +732,7 @@ const permanentDeleteClient = async (req, res) => {
 //GET API FOR RECYCLE BIN
 const getRecycleBinEntries = async (req, res) => {
     const moduleGetId = req.params.module_get_id;
-    const id = req.params.id;  // This will either be tbs_user_id or tbs_operator_id
+    const id = req.params.id;  
 
     try {
         let query;
@@ -753,20 +753,18 @@ const getRecycleBinEntries = async (req, res) => {
             params = [moduleGetId];
         } 
         else if (moduleGetId == 6) {
-            // When module_get_id is 6, look for tbs_operator_id
             query = `
                 SELECT *
                 FROM recycle_bin
                 WHERE deleted_data->'empPersonal'->>'tbs_operator_id' = $1;`;
-            params = [id];  // tbs_operator_id will be passed in the URL as the `id`
+            params = [id]; 
         }
         else if (moduleGetId == 2) {
-            // When module_get_id is 2, look for tbs_user_id
             query = `
                 SELECT *
                 FROM recycle_bin
                 WHERE deleted_data->>'tbs_user_id' = $1;`;
-            params = [id];  // tbs_user_id will be passed in the URL as the `id`
+            params = [id]; 
         } 
         else {
             query = `
@@ -846,4 +844,5 @@ const SearchRecycleBinEntries = async (req, res) => {
     }
 }
 
-module.exports = { restoreOffer, permanentlyDeleteOffer, restorePromo, permanentlyDeletePromo, restoreAd, permanentDeleteAd, restoreMobAd, permanentDeleteMobAd, restoreOperator, permanentDeleteOperator, restoreOPEmployee, permanentDeleteOPEmployee, restoreProEmployee, permanentDeleteProEmployee, restorePartner, permanentDeletePartner, restoreClient, permanentDeleteClient, getRecycleBinEntries, SearchRecycleBinEntries }
+
+module.exports = { restoreOffer, permanentlyDeleteOffer, restorePromo, permanentlyDeletePromo, restoreAd, permanentDeleteAd, restoreMobAd, permanentDeleteMobAd, restoreOperator, permanentDeleteOperator, restoreOPEmployee, permanentDeleteOPEmployee, restoreProEmployee, permanentDeleteProEmployee, restorePartner, permanentDeletePartner, restoreClient, permanentDeleteClient, getRecycleBinEntries, SearchRecycleBinEntries } 

@@ -33,13 +33,13 @@ const Inquiry = async (req, res) => {
             secure: false,
             auth: {
                 user: no_reply_email,
-                pass: process.env.INQUIRY_PASS, // Consider fetching this securely
+                pass: process.env.INQUIRY_PASS, 
             },
         });
 
         const mailOptions = {
             from: no_reply_email,
-            to: support_email,
+            to: no_reply_email,
             subject: 'New Inquiry from ' + name,
             html: `
                 <html>

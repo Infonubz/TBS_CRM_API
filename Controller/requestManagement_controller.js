@@ -143,11 +143,13 @@ const searchReqOperators = async (req, res) => {
         if (searchTerm) {
             query += ` AND (
                 LOWER(owner_name) LIKE $${paramIndex} 
-                OR phone::text LIKE $${paramIndex} 
-                OR LOWER(emailid) LIKE $${paramIndex}
+                OR LOWER(o.company_name) LIKE $${paramIndex} 
+                OR LOWER(o.tbs_operator_id) LIKE $${paramIndex} 
+                OR o.phone::text LIKE $${paramIndex} 
+                OR LOWER(o.emailid) LIKE $${paramIndex}
             )`;
             queryParams.push(`%${searchTerm}%`);
-        }
+        }        
 
         query += ` ORDER BY o.owner_name ASC`; 
 
@@ -259,7 +261,7 @@ const getRequestByStatusPartner = async (req, res) => {
         SELECT pd.*, pdoc.*
         FROM partner_details AS pd
         LEFT JOIN partner_documents AS pdoc ON pd.tbs_partner_id = pdoc.tbs_partner_id
-        WHERE pd.req_status_id IN (1,4,5,6)`;
+        WHERE pd.req_status_id IN (1,4,6)`;
         params = [];
       } else {
         query = `
@@ -328,7 +330,11 @@ const reqFilterByDatePartners = async (req, res) => {
 const searchReqPartners = async (req, res) => {
     try {
         const { req_status_id, search_term } = req.body;
-        const searchTerm = search_term ? search_term.toLowerCase() : '';
+        const searchTerm = search_term ? search_term.toLowerCase().trim() : '';
+        const nameParts = searchTerm.split(' ').filter(part => part.trim());
+        const firstNameSearch = nameParts[0] || '';
+        const lastNameSearch = nameParts[1] || '';
+
         let query = `
             SELECT pd.*, pdoc.*
             FROM partner_details AS pd
@@ -340,7 +346,7 @@ const searchReqPartners = async (req, res) => {
 
         if (req_status_id) {
             if (req_status_id == 7) {
-                query += ` AND pd.req_status_id IN (1, 4, 5, 6)`;
+                query += ` AND pd.req_status_id IN (1, 4, 6)`;
             } else {
                 query += ` AND pd.req_status_id = $${paramIndex}`;
                 queryParams.push(req_status_id);
@@ -352,13 +358,29 @@ const searchReqPartners = async (req, res) => {
             query += ` AND (
                 LOWER(pd.partner_first_name) LIKE $${paramIndex} 
                 OR LOWER(pd.partner_last_name) LIKE $${paramIndex} 
+                OR LOWER(pd.tbs_partner_id) LIKE $${paramIndex} 
+                OR LOWER(pd.occupation) LIKE $${paramIndex} 
                 OR pd.phone::text LIKE $${paramIndex} 
                 OR LOWER(pd.emailid) LIKE $${paramIndex}
             )`;
             queryParams.push(`%${searchTerm}%`);
-        }
+            paramIndex++;
+        }else if (firstNameSearch && lastNameSearch) {
+            query += ` AND LOWER(pd.partner_first_name) LIKE $${paramIndex} 
+                       AND LOWER(pd.partner_last_name) LIKE $${paramIndex + 1}`;
+            queryParams.push(`%${firstNameSearch}%`, `%${lastNameSearch}%`);
+            paramIndex += 2;
+        } else if (firstNameSearch) {
+            query += ` AND LOWER(pd.partner_first_name) LIKE $${paramIndex}`;
+            queryParams.push(`%${firstNameSearch}%`);
+            paramIndex++;
+        } else if (lastNameSearch) {
+            query += ` AND LOWER(pd.partner_last_name) LIKE $${paramIndex}`;
+            queryParams.push(`%${lastNameSearch}%`);
+            paramIndex++;
+        } 
 
-        query += ` ORDER BY pd.partner_first_name ASC`; 
+        query += ` ORDER BY pd.partner_first_name ASC`;
 
         const { rows } = await pool.query(query, queryParams);
 
@@ -513,9 +535,11 @@ const filterOffersDealsByDate = async (req, res) => {
 //Search Controller for Offers and Deals
 const searchOffersDeals = async (req, res) => {
     try {
-        const { req_status_id, search_term } = req.body;
+        const { req_status_id, search_term } = req.body; 
         const searchTerm = search_term ? search_term.toLowerCase() : '';
-        
+
+        console.log(req.body);
+
         let query = `
             SELECT *
             FROM redeem_offers
@@ -524,8 +548,8 @@ const searchOffersDeals = async (req, res) => {
         let queryParams = [];
         let paramIndex = 1;
 
-        if (req_status_id) {
-            if (req_status_id == 5) {
+        if (typeof req_status_id === 'number') { 
+            if (req_status_id === 5) {
                 query += ` AND req_status_id IN (0, 1, 2, 3, 4) `;
             } else {
                 query += ` AND req_status_id = $${paramIndex}`;
@@ -539,9 +563,9 @@ const searchOffersDeals = async (req, res) => {
                 LOWER(offer_name) LIKE $${paramIndex} OR 
                 LOWER(occupation) LIKE $${paramIndex} OR 
                 LOWER(code) LIKE $${paramIndex} OR 
-                LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $${paramIndex} OR 
-                LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $${paramIndex} OR
-                LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex} 
+                LOWER(TO_CHAR(start_date, 'DD Mon')) LIKE $${paramIndex} OR 
+                LOWER(TO_CHAR(expiry_date, 'DD Mon')) LIKE $${paramIndex} OR
+                LOWER(TO_CHAR(created_date, 'DD Mon')) LIKE $${paramIndex} 
             ) `;
             queryParams.push(`%${searchTerm}%`);
         }
@@ -551,14 +575,14 @@ const searchOffersDeals = async (req, res) => {
         if (rows.length === 0) {
             return res.status(201).json(rows);
         }
-
+        console.log(rows);
         res.status(200).json(rows);
 
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-};
+}
 
 
 //PUT Controller for Updating Status
@@ -766,19 +790,21 @@ const filterDiscountOffersDealsByDate = async (req, res) => {
 //Search Controller for Offers and Deals
 const searchDiscountOffersDeals = async (req, res) => {
     try {
-        const { req_status_id, search_term } = req.body;
+        const { req_status_id, search_term } = req.body; 
         const searchTerm = search_term ? search_term.toLowerCase() : '';
+
+        console.log(req.body);
 
         let query = `
             SELECT *
             FROM discount_offers
-            WHERE 1=1
+            WHERE 1=1 
         `;
         let queryParams = [];
         let paramIndex = 1;
 
-        if (req_status_id) {
-            if (req_status_id == 5) {
+        if (typeof req_status_id === 'number') { 
+            if (req_status_id === 5) {
                 query += ` AND req_status_id IN (0, 1, 2, 3, 4) `;
             } else {
                 query += ` AND req_status_id = $${paramIndex}`;
@@ -788,16 +814,14 @@ const searchDiscountOffersDeals = async (req, res) => {
         }
 
         if (searchTerm) {
-            query += `
-                AND (
-                    LOWER(offer_name) LIKE $${paramIndex} OR 
-                    LOWER(occupation) LIKE $${paramIndex} OR 
-                    LOWER(code) LIKE $${paramIndex} OR 
-                    LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $${paramIndex} OR 
-                    LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $${paramIndex} OR
-                    LOWER(TO_CHAR(created_date, 'Mon DD')) LIKE $${paramIndex}
-                )
-            `;
+            query += ` AND (
+                LOWER(offer_name) LIKE $${paramIndex} OR 
+                LOWER(occupation) LIKE $${paramIndex} OR 
+                LOWER(code) LIKE $${paramIndex} OR 
+                LOWER(TO_CHAR(start_date, 'DD Mon')) LIKE $${paramIndex} OR 
+                LOWER(TO_CHAR(expiry_date, 'DD Mon')) LIKE $${paramIndex} OR
+                LOWER(TO_CHAR(created_date, 'DD Mon')) LIKE $${paramIndex} 
+            ) `;
             queryParams.push(`%${searchTerm}%`);
         }
 
@@ -806,14 +830,14 @@ const searchDiscountOffersDeals = async (req, res) => {
         if (rows.length === 0) {
             return res.status(201).json(rows);
         }
-
+        console.log(rows);
         res.status(200).json(rows);
 
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-};
+}
 
 //PUT Controller for Updating Status
 const updateDiscountOfferDealStatus = async (req, res) => {

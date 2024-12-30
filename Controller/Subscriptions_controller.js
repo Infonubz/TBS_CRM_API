@@ -57,12 +57,38 @@ const getAllRecords = async (req, res) => {
   
 //GET ALL SUBSCRIPTIONS
 const getSubscriptions = async (req, res) => {
-    try{
-        const result = await pool.query('SELECT * FROM subscriptions_tbl ORDER BY created_date DESC');
-        res.status(200).send(result.rows);
-    } catch(err) {
-        console.log(err.message);
-        res.status(500).json({ error : "Error getting records" });
+    try {
+        const query = `
+            SELECT 
+                o.profileimg,
+                o.company_name,
+                o.owner_name,
+                o.phone,
+                o.emailid,
+                od.gstin,
+                od.type_of_constitution,
+                od.business_background, 
+                s.*
+            FROM 
+                operators_tbl o
+            LEFT JOIN 
+                operator_details od 
+            ON 
+                o.tbs_operator_id = od.tbs_operator_id
+            INNER JOIN 
+                subscriptions_tbl s 
+            ON 
+                o.tbs_operator_id = s.tbs_operator_id
+            ORDER BY 
+                s.created_date DESC;
+        `;
+
+        const result = await pool.query(query);
+
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error('Error executing query:', err.stack);
+        res.status(500).json({ error: 'Error retrieving records' });
     }
 }
 
@@ -183,14 +209,15 @@ const searchSubscription = async (req, res) => {
                 o.tbs_operator_id = s.tbs_operator_id 
                 AND s.row_num = 1
             WHERE 
-                o.user_status_id = 1
+                o.user_status_id = 2
                 AND (
                     LOWER(s.plan_name) LIKE $1
                     OR LOWER(s.plan_type) LIKE $1
+                    OR LOWER(s.generate_key) LIKE $1
                     OR LOWER(o.company_name) LIKE $1
                     OR LOWER(o.owner_name) LIKE $1
-                    OR (TO_CHAR(s.created_date, 'Mon') || ' ' || TO_CHAR(s.created_date, 'DD')) ILIKE $1
-                    OR (TO_CHAR(s.end_date, 'Mon') || ' ' || TO_CHAR(s.end_date, 'DD')) ILIKE $1
+                    OR (TO_CHAR(s.created_date, 'DD') || ' ' || TO_CHAR(s.created_date, 'Mon')) ILIKE $1
+                    OR (TO_CHAR(s.end_date, 'DD') || ' ' || TO_CHAR(s.end_date, 'Mon')) ILIKE $1
                 )
             ORDER BY 
                 o.created_date DESC;
@@ -211,4 +238,71 @@ const searchSubscription = async (req, res) => {
     }
 }
 
-module.exports = { getAllRecords, getSubscriptions, getSubscriptionbyId, deleteSubscription, postSubscription, putSubscription, searchSubscription }
+//SEARCH SUBSCRIPTION FILTER BY START DATE
+const filterByStartDate = async (req, res) => {
+    try {
+        const { from, to } = req.body; 
+        if (!from || !to) {
+            return res.status(400).json({ error: 'Both from and to dates are required.' });
+        }
+
+        let query = `
+            SELECT 
+                o.profileimg,
+                o.tbs_operator_id, 
+                o.company_name, 
+                o.owner_name, 
+                o.phone, 
+                o.emailid, 
+                o.created_date,
+                od.gstin,
+                od.type_of_constitution, 
+                od.business_background, 
+                s.plan_name, 
+                s.plan_type,
+                s.generate_key,
+                s.created_date
+            FROM 
+                operators_tbl o
+            LEFT JOIN 
+                operator_details od 
+            ON 
+                o.tbs_operator_id = od.tbs_operator_id
+            LEFT JOIN 
+                (
+                    SELECT 
+                        tbs_operator_id, 
+                        plan_name, 
+                        plan_type, 
+                        generate_key,
+                        created_date,
+                        end_date,
+                        ROW_NUMBER() OVER(PARTITION BY tbs_operator_id ORDER BY created_date DESC) AS row_num
+                    FROM 
+                        subscriptions_tbl
+                ) s 
+            ON 
+                o.tbs_operator_id = s.tbs_operator_id 
+                AND s.row_num = 1
+            WHERE 
+                s.created_date BETWEEN $1 AND $2::DATE + INTERVAL '1 day' - INTERVAL '1 second'
+            ORDER BY 
+                s.created_date ASC;
+        `;
+
+        const queryParams = [from, to];
+
+        const result = await pool.query(query, queryParams);
+
+        if (result.rows.length === 0) {
+            return res.json({ message: 'No records found for the given date range.' });
+        }
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Error executing query:', err.stack);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+}
+
+module.exports = { getAllRecords, getSubscriptions, getSubscriptionbyId, deleteSubscription, postSubscription, putSubscription, searchSubscription, filterByStartDate }

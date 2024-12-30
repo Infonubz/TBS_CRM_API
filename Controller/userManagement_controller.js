@@ -25,6 +25,29 @@ const getAllOperatorDetails = async (req, res) => {
     }
 }
 
+// operator_personal_details GET CONTROLLER by User ID
+const getOperatorByUserId = async (req, res) => {
+    const { tbs_user_id } = req.params;
+
+    try {
+        const query = `SELECT o.*, od.*
+        FROM operators_tbl AS o
+        LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id
+        WHERE o.tbs_user_id = $1 AND o.user_status_id IN (0,1,2,3) ORDER BY created_date DESC`;
+
+        const result = await pool.query(query, [tbs_user_id]);
+
+        if (result.rowCount === 0) {
+            return res.status(200).json({ message: 'Operator not found for the given user ID' });
+        }
+
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database query failed' });
+    }
+};
+
 //user management-OPERATORS GETbyID CONTROLLER
 const getOperatorByID = async (req, res) => {
     const operatorid = req.params.tbs_operator_id
@@ -206,8 +229,7 @@ const getAllPartnerDetails = async (req, res) => {
             SELECT pd.*, pdoc.*
             FROM partner_details AS pd
             LEFT JOIN partner_documents AS pdoc ON pd.tbs_partner_id = pdoc.tbs_partner_id
-            WHERE pd.partner_status_id IN (0,1,2,3)
-        `;
+            WHERE pd.partner_status_id IN (0,1,2,3) ORDER BY created_date DESC `;
         const result = await pool.query(query);
 
         if (result.rowCount === 0) {
@@ -238,34 +260,76 @@ const getPartnerByID = async (req, res) => {
         console.error('Error executing query', err.stack);
         res.status(500).send('Server error');
     }
-;}
+}
 
+const getPartnerByUserID = async (req, res) => {
+    const { tbs_user_id } = req.params;
+
+    try {
+        const query = `
+            SELECT pd.*, pdoc.*
+            FROM partner_details AS pd
+            LEFT JOIN partner_documents AS pdoc ON pd.tbs_partner_id = pdoc.tbs_partner_id
+            WHERE pd.tbs_user_id = $1 AND pd.partner_status_id IN (0,1,2,3) ORDER BY created_date DESC
+        `;
+        const result = await pool.query(query, [tbs_user_id]);
+
+        if (result.rows.length === 0) {
+            console.log("No matching records found for tbs_user_id:", tbs_user_id);
+            return res.status(200).json({ message: 'No partner found with the provided user ID' });
+        }
+
+        res.status(200).json(result.rows);
+    } catch (err) {
+        console.error('Error executing query', err.stack);
+        res.status(500).json({ error: 'Server error' });
+    }
+}
 
 //SEARCH PARTNER DETAILS
 const searchPartnerDetails = async (req, res) => {
     try {
         let query;
         let queryParams = [];
-
-        const searchTerm = req.params.searchTerm;
+        const { tbs_user_id, searchTerm } = req.params;
 
         if (searchTerm && typeof searchTerm === 'string') {
-            const searchValue = `%${searchTerm.toLowerCase()}%`;
-
+            const [firstNameSearch, lastNameSearch] = searchTerm.split(' ').map(term => term.trim());
+            let paramIndex = 2;
+        
+            if (firstNameSearch && lastNameSearch) {
+                query = `
+                    SELECT *
+                    FROM partner_details AS pd
+                    LEFT JOIN partner_documents AS pod
+                        ON pd.tbs_partner_id = pod.tbs_partner_id
+                    WHERE partner_status_id NOT IN (4, 5, 6) AND tbs_user_id = $1
+                    AND LOWER(pd.partner_first_name) LIKE $${paramIndex}
+                    AND LOWER(pd.partner_last_name) LIKE $${paramIndex + 1} `;
+                queryParams = [tbs_user_id, `%${firstNameSearch.toLowerCase()}%`, `%${lastNameSearch.toLowerCase()}%`];
+            } else {
+                query = `
+                    SELECT *
+                    FROM partner_details AS pd
+                    LEFT JOIN partner_documents AS pod
+                        ON pd.tbs_partner_id = pod.tbs_partner_id
+                    WHERE partner_status_id NOT IN (4, 5, 6) AND tbs_user_id = $1
+                    AND (
+                        CAST(pd.phone AS TEXT) LIKE $${paramIndex}
+                        OR LOWER(pd.partner_first_name) LIKE $${paramIndex}
+                        OR LOWER(pd.tbs_partner_id) LIKE $${paramIndex}
+                        OR LOWER(pd.partner_last_name) LIKE $${paramIndex}
+                        OR LOWER(pd.emailid) LIKE $${paramIndex}
+                        OR LOWER(pd.occupation) LIKE $${paramIndex}
+                        OR LOWER(TO_CHAR(created_date, 'DD Mon')) LIKE $${paramIndex}
+                    ) `;
+                queryParams = [tbs_user_id, `%${searchTerm.toLowerCase()}%`];
+            }
+        }else {
             query = `
                 SELECT *
                 FROM partner_details
-                WHERE LOWER(partner_first_name) LIKE $1
-                   OR CAST(phone AS TEXT) LIKE $1
-                   OR LOWER(emailid) LIKE $1
-            `;
-
-            queryParams = [searchValue];
-        } else {
-            query = `
-                SELECT *
-                FROM partner_details
-            `;
+                WHERE partner_status_id NOT IN (4, 5, 6) `;
         }
 
         const result = await pool.query(query, queryParams);
@@ -274,16 +338,14 @@ const searchPartnerDetails = async (req, res) => {
         console.error('Error executing query', err);
         res.status(500).json({ message: "Error searching records" });
     }
-};
-
+}
 
 //SEARCH CLIENT DETAILS
 const searchClientDetails = async (req, res) => {
     try {
         let query;
         let queryParams = [];
-
-        const searchTerm = req.params.searchTerm;
+        const { tbs_user_id, searchTerm } = req.params;
 
         if (searchTerm && typeof searchTerm === 'string') {
             const searchValue = `%${searchTerm.toLowerCase()}%`;
@@ -291,14 +353,18 @@ const searchClientDetails = async (req, res) => {
             query = `
                 SELECT *
                 FROM client_company_details
-                WHERE LOWER(owner_name) LIKE $1
-                   OR CAST(phone AS TEXT) LIKE $1
-                   OR LOWER(emailid) LIKE $1 `;
+                WHERE tbs_user_id = $1 AND (LOWER(owner_name) LIKE $2
+                OR LOWER(company_name) LIKE $2
+                OR LOWER(tbs_client_id) LIKE $2
+                OR LOWER(business_background) LIKE $2
+                OR CAST(phone AS TEXT) LIKE $2
+                OR LOWER(emailid) LIKE $2
+                OR LOWER(TO_CHAR(created_date, 'DD Mon')) LIKE $2) `;
 
-            queryParams = [searchValue];
+            queryParams = [tbs_user_id, searchValue];
         } else {
-            query = ` SELECT *
-                        FROM client_company_details `;
+            query = `SELECT * FROM client_company_details WHERE tbs_user_id = $1`;
+            queryParams = [tbs_user_id]
         }
 
         const result = await pool.query(query, queryParams);
@@ -322,10 +388,15 @@ const searchProEmpDetails = async (req, res) => {
 
             query = `
                 SELECT *
-                FROM pro_emp_personal_details
-                WHERE LOWER(emp_first_name) LIKE $1
-                   OR CAST(phone AS TEXT) LIKE $1
-                   OR LOWER(email_id) LIKE $1
+                FROM pro_emp_personal_details AS pop
+                LEFT JOIN pro_emp_professional_details AS po ON pop.tbs_pro_emp_id = po.tbs_pro_emp_id
+                WHERE LOWER(pop.emp_first_name) LIKE $1
+                   OR CAST(pop.phone AS TEXT) LIKE $1
+                   OR LOWER(pop.email_id) LIKE $1
+                   OR LOWER(pop.tbs_pro_emp_id) LIKE $1
+                   OR LOWER(po.designation) LIKE $1
+                   OR LOWER(po.role_type) LIKE $1
+                   OR LOWER(TO_CHAR(po.created_date, 'DD Mon')) LIKE $1
             `;
 
             queryParams = [searchValue];
@@ -344,4 +415,66 @@ const searchProEmpDetails = async (req, res) => {
     }
 } 
 
-module.exports = { getAllOperatorDetails, getOperatorByID, putUser_Status, getAllPartnerDetails, getPartnerByID, searchPartnerDetails, searchClientDetails, searchProEmpDetails }
+const getClientDetails = async (req, res) => {
+    try {
+        const query = `
+            SELECT 
+                ccd.*, 
+                cad.*, 
+                csd.*
+            FROM 
+                client_company_details ccd
+            LEFT JOIN 
+                client_address_details cad ON ccd.tbs_client_id = cad.tbs_client_id
+            LEFT JOIN 
+                client_gst_details csd ON ccd.tbs_client_id = csd.tbs_client_id ORDER BY created_date DESC
+        `
+        
+        const result = await pool.query(query)
+
+        if (result.rowCount === 0) {
+            return res.status(201).json(result.rows)
+        }
+
+        res.status(200).json(result.rows)
+    } catch (err) {
+        console.error('Error fetching client details', err)
+        res.status(500).json({ error: 'Database query failed' })
+    }
+}
+
+const getClientDetailsByUserId = async (req, res) => {
+    const { tbs_user_id } = req.params; 
+
+    try {
+        const query = `
+            SELECT 
+                ccd.*, 
+                cad.*, 
+                csd.*
+            FROM 
+                client_company_details ccd
+            LEFT JOIN 
+                client_address_details cad ON ccd.tbs_client_id = cad.tbs_client_id
+            LEFT JOIN 
+                client_gst_details csd ON ccd.tbs_client_id = csd.tbs_client_id
+            WHERE
+                ccd.tbs_user_id = $1
+            ORDER BY 
+                ccd.created_date DESC
+        `;
+
+        const result = await pool.query(query, [tbs_user_id]); 
+
+        if (result.rowCount === 0) {
+            return res.status(200).json({ message: 'No client details found for the provided user ID' });
+        }
+
+        res.status(200).json(result.rows); 
+    } catch (err) {
+        console.error('Error fetching client details by user ID', err);
+        res.status(500).json({ error: 'Database query failed' });
+    }
+};
+
+module.exports = { getAllOperatorDetails, getOperatorByID, putUser_Status, getAllPartnerDetails, getPartnerByID, searchPartnerDetails, searchClientDetails, searchProEmpDetails, getOperatorByUserId, getPartnerByUserID, getClientDetails, getClientDetailsByUserId }

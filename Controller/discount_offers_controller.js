@@ -389,8 +389,8 @@ const searchOffers = async (req, res) => {
                 WHERE LOWER(offer_name) LIKE $1
                     OR LOWER(code) LIKE $1
                     OR LOWER(offer_value::TEXT) LIKE $1 
-                    OR LOWER(TO_CHAR(start_date, 'Mon DD')) LIKE $1
-                    OR LOWER(TO_CHAR(expiry_date, 'Mon DD')) LIKE $1
+                    OR LOWER(TO_CHAR(start_date, 'DD Mon')) LIKE $1
+                    OR LOWER(TO_CHAR(expiry_date, 'DD Mon')) LIKE $1
             `;
             queryParams = [`%${searchTerm}%`];
         } else {

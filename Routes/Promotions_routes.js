@@ -73,6 +73,6 @@ promotionsRouter.get('/promo-operatorDetails', getOperatorRecords);
 promotionsRouter.post('/promo/filter', promoFilterByDate);
 promotionsRouter.get('/recentPromos', getRecentPromos);
 promotionsRouter.get('/getLivePromotions', getLivePromotions)
-promotionsRouter.post('/promo/searchPromoById/:tbs_user_id', searchPromoById)
+promotionsRouter.post('/promo/searchPromoById/:tbs_user_id/:user_status_id', searchPromoById)
 
 module.exports = { promotionsRouter };

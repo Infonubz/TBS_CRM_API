@@ -1,5 +1,6 @@
 const pool = require('../config/db')
 const xlsx = require('xlsx')
+const nodemailer = require('nodemailer')
 
 //check client email exist or not
 const getEmails = async (req, res) => {
@@ -49,30 +50,61 @@ const getEmails = async (req, res) => {
 
 // CLIENT COMPANY details POST CONTROLLER
 const postClient = async (req, res) => {
-    const { company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, req_status, req_status_id } = req.body
-    
-    const type_name = 'CLIENT'
-    const type_id = 'CLT101'
-    const status = 'draft'
-    const status_id = 0
+    const { company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, req_status, req_status_id, tbs_user_id } = req.body;
+
+    if (!company_name || !owner_name || !phone || !emailid || !type_of_constitution || !business_background || !tbs_user_id) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const type_name = 'CLIENT';
+    const type_id = 'CLT101';
+    const status = 'draft';
+    const status_id = 0;
     const company_logo = req.file ? `/client_files/${req.file.filename}` : null;
 
     try {
+        if (tbs_user_id.startsWith('tbs-pro_emp')) {
+            const empResult = await pool.query(
+                `SELECT emp_status_id FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`,
+                [tbs_user_id]
+            );
+
+            if (empResult.rows.length === 0) {
+                return res.status(400).json({ error: 'Employee ID does not exist.' });
+            }
+
+            const empStatusId = empResult.rows[0].emp_status_id;
+            if (empStatusId !== 1) {
+                return res.status(400).json({ error: 'Employee ID is not active.' });
+            }
+        } else if (tbs_user_id.startsWith('tbs-pro')) {
+            const proResult = await pool.query(
+                `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`,
+                [tbs_user_id]
+            );
+
+            if (proResult.rows.length === 0) {
+                return res.status(400).json({ error: 'Product owner ID does not exist.' });
+            }
+        } else {
+            return res.status(400).json({ error: 'Invalid tbs_user_id format.' });
+        }
+
         const result = await pool.query(
             `INSERT INTO client_company_details 
-             (company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, type_name, type_id, status, status_id, company_logo, req_status, req_status_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING tbs_client_id`,
-            [company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, type_name, type_id, status, status_id, company_logo, 'Pending', 0]
-        )
-        
-        const tbs_client_id = result.rows[0].tbs_client_id
+             (company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, type_name, type_id, status, status_id, company_logo, req_status, req_status_id, tbs_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING tbs_client_id`,
+            [company_name, owner_name, phone, emailid, type_of_constitution, business_background, web_url, type_name, type_id, status, status_id, company_logo, 'Pending', 0, tbs_user_id]
+        );
 
-        const password = `CLT@${tbs_client_id}`
+        const tbs_client_id = result.rows[0].tbs_client_id;
+
+        const password = `CLT@${tbs_client_id}`;
 
         await pool.query(
             `UPDATE client_company_details SET password = $1 WHERE tbs_client_id = $2`,
             [password, tbs_client_id]
-        )
+        );
 
         res.status(201).json({
             message: 'Client Created Successfully',
@@ -80,10 +112,10 @@ const postClient = async (req, res) => {
             password: password,
             type_name: type_name,
             type_id: type_id
-        })
+        });
     } catch (err) {
-        console.error('Error inserting into database:', err)
-        res.status(500).json({ error: 'Database insertion failed' })
+        console.error('Error inserting into database:', err);
+        res.status(500).json({ error: 'Database insertion failed' });
     }
 }
 
@@ -130,27 +162,87 @@ const GetClientProfileImg = async (req, res) => {
 };
 
 // PUT STATUS ONLY
-    const putClientCompanyDetails = async (req, res) => {
-        const { tbs_client_id } = req.params
-        const { status, status_id } = req.body
-    
-        try {
-            const query = `
+const putClientCompanyDetails = async (req, res) => {
+    const { tbs_client_id } = req.params;
+    const { status, status_id } = req.body;
+
+    try {
+        const updateQuery = `
             UPDATE client_company_details
             SET 
                 status = COALESCE($1, status),
                 status_id = COALESCE($2, status_id)
             WHERE 
-                tbs_client_id = $3;            
-            `
-            await pool.query(query, [status, status_id, tbs_client_id])
-            res.status(200).send('Client company details status updated successfully.')
-        } catch (error) {
-            console.error('Error updating client company details:', error)
-            res.status(500).send('Database update failed')
+                tbs_client_id = $3;
+        `;
+        await pool.query(updateQuery, [status, status_id, tbs_client_id]);
+
+        const fetchEmailQuery = `
+            SELECT emailid 
+            FROM client_company_details 
+            WHERE tbs_client_id = $1;
+        `;
+        const { rows } = await pool.query(fetchEmailQuery, [tbs_client_id]);
+
+        if (rows.length === 0) {
+            return res.status(404).send('Client not found.');
         }
+
+        const email_id = rows[0].emailid;
+
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.office365.com',
+            port: 587,
+            secure: false, 
+            auth: {
+                user: 'no-reply@thebusstand.com',
+                pass: 'bdqbqlgqgcnnrxrr',
+            },
+        });
+
+        const mailOptions = {
+            from: 'no-reply@thebusstand.com',
+            to: email_id,
+            subject: 'Status Update Notification - TheBusStand',
+            html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px;">
+            <div style="background-color: #1F487C; padding: 10px; border-radius: 10px 10px 0 0; text-align: center; color: #fff;">
+                <a style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0; text-decoration: none;">
+                    THEBUSSTAND.COM
+                </a>
+            </div>
+            <div style="padding: 20px; background-color: #ffffff; text-align: center; border: 3px solid #1F487C; border-radius: 0 0 10px 10px;">
+                <h2 style="color: #1F487C; font-size: 22px; margin-bottom: 8px;">Status Update Notification</h2>
+                <p style="font-size: 16px; color: #1F487C; margin-bottom: 15px;">
+                    Your account status has been updated to: <strong>${status || 'Unchanged'}</strong>.
+                </p>
+                <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                    If you have any questions, feel free to reach out to our support team.
+                </p>
+                <a href="mailto:support@thebusstand.com" 
+                style="display: inline-block; padding: 10px 20px; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; background-color: #1F487C; border-radius: 5px; margin-top: 15px;">
+                Contact Support
+                </a>
+            </div>
+            <div style="padding: 10px; background-color: #D2DAE5; text-align: center; border-radius: 0 0 10px 10px;">
+                <p style="font-size: 12px; color: #999; margin: 0;">
+                    This email was sent by TheBusStand no-reply.
+                </p>
+                <p style="font-size: 12px; color: #999; margin: 5px 0 0 0;">
+                    © 2024 TheBusStand. All rights reserved.
+                </p>
+            </div>
+        </div> `,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).send('Client company details updated and email notification sent successfully.');
+    } catch (error) {
+        console.error('Error updating client company details or sending email:', error);
+        res.status(500).send('Failed to update client details or send email notification.');
     }
-    
+}   
 
 // PUT CONTROLLER
     const putClient = async (req, res) => {
@@ -432,34 +524,6 @@ const getAllGst = async (req, res) => {
     }
 }
 
-const getClientDetails = async (req, res) => {
-    try {
-        const query = `
-            SELECT 
-                ccd.*, 
-                cad.*, 
-                csd.*
-            FROM 
-                client_company_details ccd
-            LEFT JOIN 
-                client_address_details cad ON ccd.tbs_client_id = cad.tbs_client_id
-            LEFT JOIN 
-                client_gst_details csd ON ccd.tbs_client_id = csd.tbs_client_id
-        `
-        
-        const result = await pool.query(query)
-
-        if (result.rowCount === 0) {
-            return res.status(201).json(result.rows)
-        }
-
-        res.status(200).json(result.rows)
-    } catch (err) {
-        console.error('Error fetching client details', err)
-        res.status(500).json({ error: 'Database query failed' })
-    }
-}
-
 //import excel data
 const ExcelUpload = async (req, res) => {
     const file = req.file;
@@ -477,19 +541,30 @@ const ExcelUpload = async (req, res) => {
 
         for (const row of data) {
             try {
+                const { rows: existing } = await pool.query(
+                    `SELECT phone, emailid FROM client_company_details
+                     WHERE phone = $1 OR LOWER(emailid) = LOWER($2)`,
+                    [row['phone'], row['emailid']]
+                );
+
+                let phone = row['phone'];
+                let emailid = row['emailid'];
+
+                if (existing.length > 0) {
+                    phone = null;
+                    emailid = null;
+                }
+
                 const clientData = [
-                    row['company_name'], row['owner_name'], row['phone'],
-                    row['emailid'], row['type_of_constitution'],
-                    row['business_background'], row['web_url'],
-                    row['status'], row['status_id']
+                    row['company_name'], row['owner_name'], phone,
+                    emailid, row['web_url']
                 ];
 
                 const result = await pool.query(
                     `INSERT INTO client_company_details (
-                        company_name, owner_name, phone, emailid,
-                        type_of_constitution, business_background, web_url,
+                        company_name, owner_name, phone, emailid, web_url,
                         type_name, type_id, password, status, status_id
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'CLIENT', 'CLT101', '', $8, $9)
+                    ) VALUES ($1, $2, $3, $4, $5, 'CLIENT', 'CLT101', '', 'Draft', 0)
                     RETURNING tbs_client_id`,
                     clientData
                 );
@@ -506,32 +581,24 @@ const ExcelUpload = async (req, res) => {
                 );
 
                 const addressData = [
-                    tbs_client_id, row['address'], row['state'], row['state_id'],
-                    row['region'], row['region_id'], row['city'], row['city_id'],
-                    row['country'], row['country_id'], row['zip_code']
+                    tbs_client_id, row['address'], row['zip_code']
                 ];
 
                 const gstData = [
-                    tbs_client_id, row['has_gstin'],
-                    row['aggregate_turnover_exceeded'], row['state_name'],
-                    row['state_code_number'], row['gstin'], row['head_office']
+                    tbs_client_id, row['gstin'], row['head_office']
                 ];
 
                 await pool.query(
                     `UPDATE client_address_details
-                     SET address = $2, state = $3, state_id = $4,
-                         region = $5, region_id = $6, city = $7,
-                         city_id = $8, country = $9, country_id = $10,
-                         zip_code = $11
+                     SET address = $2, zip_code = $3
                      WHERE tbs_client_id = $1;`,
                     addressData
                 );
 
                 await pool.query(
                     `UPDATE client_gst_details
-                     SET has_gstin = $2, aggregate_turnover_exceeded = $3,
-                         state_name = $4, state_code_number = $5,
-                         gstin = $6, head_office = $7
+                     SET 
+                         gstin = $2, head_office = $3
                      WHERE tbs_client_id = $1;`,
                     gstData
                 );
@@ -549,6 +616,7 @@ const ExcelUpload = async (req, res) => {
         console.error('Transaction failed:', error);
         res.status(500).send('Error inserting/updating data.');
     }
-}
+};
 
-module.exports = { postClient, deleteClient, getClientcompany, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, getClientDetails, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById, getEmails, getPhones }
+
+module.exports = { postClient, deleteClient, getClientcompany, getclientByID, putClient, updateClientAddress, getClientAddressById, deleteClientAddress, getAllClientAddresses, putClientGst, deleteClientGst, getGstByid, getAllGst, putClientCompanyDetails, ExcelUpload, GetClientProfileImg, GetClientProfileImgById, getEmails, getPhones }

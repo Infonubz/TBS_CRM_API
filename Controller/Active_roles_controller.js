@@ -78,10 +78,10 @@ const postRole = async (req, res) => {
         const checkRoleQuery = `
             SELECT COUNT(*) AS role_exists
             FROM active_roles_tbl
-            WHERE user_id = $1 AND role_type = $2
+            WHERE user_id = $1 AND LOWER(role_type) = LOWER($2)
         `;
         const checkResult = await pool.query(checkRoleQuery, [userId, role_type]);
-        const roleExists = checkResult.rows[0].role_exists;
+        const roleExists = parseInt(checkResult.rows[0].role_exists, 10);
 
         if (roleExists > 0) {
             return res.status(401).json({ exist: true, message: "Role already exists" });
@@ -89,8 +89,7 @@ const postRole = async (req, res) => {
 
         const insertRoleQuery = `
             INSERT INTO active_roles_tbl (user_id, "user", role_type, description, tbs_user_id)
-            VALUES ($1, $2, $3, $4, $5)
-        `;
+            VALUES ($1, $2, $3, $4, $5) `;
         await pool.query(insertRoleQuery, [userId, normalizedUser, role_type, description, tbs_user_id]);
 
         return res.status(201).json({ exist: false, message: "Role inserted successfully" });
@@ -182,7 +181,6 @@ const getRoleMemberCountOpEmp = async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 }
-
 
 //GET ROLE MEMBER COUNT - PERMISSION FROM PRO-EMP TABLE
 const getRoleMemberCountProEmp = async (req, res) => {
@@ -298,7 +296,7 @@ const getRoleMemberCountProEmp = async (req, res) => {
             sr.role_type AS role,
             COALESCE(COUNT(DISTINCT er.tbs_op_emp_id), 0) AS role_count,
             COALESCE(pc.permission_access_count, 0) AS permission_access_count,
-            sr.role_id 
+            sr.role_id  AS role_type_id
         FROM 
             selected_roles sr
         LEFT JOIN 
@@ -326,7 +324,7 @@ const getRoleMemberCountProEmp = async (req, res) => {
                 SET role_member_count = $1
                 WHERE role_type = $2 AND role_id = $3
             `;
-            const updateParams = [row.role_count, row.role, row.role_id];
+            const updateParams = [row.role_count, row.role, row.role_type_id];
             await pool.query(updateQuery, updateParams);
         });
 
@@ -391,7 +389,7 @@ const searchRoleMemberCountProEmp = async (req, res) => {
             ON 
                 p.tbs_pro_emp_id = pr.tbs_pro_emp_id
             WHERE 
-                pr.emp_status = 'Active'  -- Only active employees
+                pr.emp_status = 'Active'  
                 AND pr.emp_status_id = 1
             GROUP BY 
                 p.role_type, p.role_type_id
@@ -437,7 +435,7 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         ON 
             r.role = p.role
         WHERE 
-            LOWER(r.role) LIKE LOWER($1)  -- Apply search filter
+            LOWER(r.role) LIKE LOWER($1)  
         ORDER BY 
             r.role;`;
     } else if (role === 'OP') {
@@ -485,7 +483,7 @@ const searchRoleMemberCountProEmp = async (req, res) => {
         LEFT JOIN 
             permission_counts pc ON sr.role_type = pc.role_type
         WHERE 
-            LOWER(sr.role_type) LIKE LOWER($1)  -- Apply search filter
+            LOWER(sr.role_type) LIKE LOWER($1)
         GROUP BY 
             sr.role_type, pc.permission_access_count
         ORDER BY 

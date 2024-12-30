@@ -55,43 +55,99 @@ const getPhones = async (req, res) => {
 
 // operator_personal_details POST CONTROLLER
 const postOperator = async (req, res) => {
-    const { company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id } = req.body
-    
-        const type_name = 'OPERATOR'
-        const type_id = 'OP101'
+    const {
+        company_name, 
+        owner_name, 
+        phone, 
+        alternate_phone, 
+        emailid, 
+        alternate_emailid, 
+        aadharcard_number, 
+        pancard_number, 
+        user_status, 
+        req_status, 
+        user_status_id, 
+        req_status_id, 
+        tbs_user_id
+    } = req.body;
 
-        
-       const profileimg = req.file ? `/operator_files/${req.file.filename}` : null;
-    
-        try {
-            const result = await pool.query(
-                `INSERT INTO operators_tbl 
-                 (company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id, profileimg)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING tbs_operator_id`,
-                [company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id, profileimg]
+    const type_name = 'OPERATOR';
+    const type_id = 'OP101';
+    const profileimg = req.file ? `/operator_files/${req.file.filename}` : null;
+
+    try {
+        if (tbs_user_id.startsWith('tbs-pro_emp')) {
+            const empResult = await pool.query(
+                `SELECT emp_status_id FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`,
+                [tbs_user_id]
             );
-            
-            const tbs_operator_id = result.rows[0].tbs_operator_id;
-    
-            const password = `OP@${tbs_operator_id}`;
-    
-            await pool.query(
-                `UPDATE operators_tbl SET password = $1 WHERE tbs_operator_id = $2`,
-                [password, tbs_operator_id]
-            )
-    
-            res.status(201).json({
-                message: 'Operator Created Successfully',
-                id: tbs_operator_id,
-                password: password,
-                type_name: type_name,
-                type_id: type_id
-            });
-        } catch (err) {
-            console.error('Error inserting into database:', err);
-            res.status(500).json({ error: 'Database insertion failed' });
+
+            if (empResult.rows.length === 0) {
+                return res.status(400).json({ error: 'Employee ID does not exist.' });
+            }
+
+            const empStatusId = empResult.rows[0].emp_status_id;
+            if (empStatusId !== 1) {
+                return res.status(400).json({ error: 'Employee ID is not active.' });
+            }
+        } else if (tbs_user_id.startsWith('tbs-pro')) {
+            const proResult = await pool.query(
+                `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`,
+                [tbs_user_id]
+            );
+
+            if (proResult.rows.length === 0) {
+                return res.status(400).json({ error: 'Product owner ID does not exist.' });
+            }
+        } else {
+            return res.status(400).json({ error: 'Invalid tbs_user_id format.' });
         }
+
+        const result = await pool.query(
+            `INSERT INTO operators_tbl 
+             (company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid, aadharcard_number, pancard_number, user_status, req_status, user_status_id, req_status_id, type_name, type_id, profileimg, tbs_user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING tbs_operator_id`,
+            [
+                company_name, 
+                owner_name, 
+                phone, 
+                alternate_phone, 
+                emailid, 
+                alternate_emailid, 
+                aadharcard_number, 
+                pancard_number, 
+                user_status, 
+                req_status, 
+                user_status_id, 
+                req_status_id, 
+                type_name, 
+                type_id, 
+                profileimg, 
+                tbs_user_id
+            ]
+        );
+
+        const tbs_operator_id = result.rows[0].tbs_operator_id;
+
+        const password = `OP@${tbs_operator_id}`;
+
+        await pool.query(
+            `UPDATE operators_tbl SET password = $1 WHERE tbs_operator_id = $2`,
+            [password, tbs_operator_id]
+        );
+
+        res.status(201).json({
+            message: 'Operator Created Successfully',
+            id: tbs_operator_id,
+            password: password,
+            type_name: type_name,
+            type_id: type_id
+        });
+    } catch (err) {
+        console.error('Error inserting into database:', err);
+        res.status(500).json({ error: 'Database insertion failed' });
     }
+}
 
 // operator personal details PUT controller
 const putOperatorPersonal = async (req, res) => {
@@ -277,31 +333,33 @@ try {
 // search CONTROLLER
 const searchOperator = async (req, res) => {
     const searchTerm = req.params.search_term ? req.params.search_term.toLowerCase() : '';
+    const tbs_user_id = req.params.tbs_user_id;
 
     try {
         let query;
-        let queryParams;
+        let queryParams = [];
 
         if (searchTerm) {
             query = `
             SELECT *
             FROM operators_tbl AS o
             LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id  
-            WHERE LOWER(o.company_name) LIKE $1
-                OR LOWER(o.owner_name) LIKE $1
-                OR LOWER(od.business_background) LIKE $1
-                OR LOWER(o.tbs_operator_id::text) LIKE $1
-                OR o.phone::text LIKE $1
-                OR LOWER(o.emailid) LIKE $1
-                OR LOWER(TO_CHAR(o.created_date, 'Mon DD')) LIKE $1;
+            WHERE o.tbs_user_id = $1 AND (LOWER(o.company_name) LIKE $2
+                OR LOWER(o.owner_name) LIKE $2
+                OR LOWER(od.business_background) LIKE $2
+                OR LOWER(o.tbs_operator_id::text) LIKE $2
+                OR o.phone::text LIKE $2
+                OR LOWER(o.emailid) LIKE $2
+                OR LOWER(TO_CHAR(o.created_date, 'DD Mon')) LIKE $2);
             `;
-            queryParams = [`%${searchTerm}%`];
+            queryParams = [tbs_user_id, `%${searchTerm}%`];
         } else {
             query = `
             SELECT *
             FROM operators_tbl AS o
-            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id  `;
-            queryParams = [];
+            LEFT JOIN operator_details AS od ON o.tbs_operator_id = od.tbs_operator_id WHERE o.tbs_user_id = $1;
+            `;
+            queryParams = [tbs_user_id];
         }
 
         const { rows } = await pool.query(query, queryParams);
@@ -312,7 +370,7 @@ const searchOperator = async (req, res) => {
         console.error('Error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-};
+}
 
 //operator_details POST CONTROLLERS
 const operator_details = async (req, res) => {
@@ -1031,8 +1089,7 @@ const getImgByID = async (req, res) => {
        SELECT 
        tbs_operator_id,
        profileimg
-       FROM operators_tbl WHERE tbs_operator_id = $1 ;
-       `;
+       FROM operators_tbl WHERE tbs_operator_id = $1 ; `;
        const result = await pool.query(query, [id]);
 
        if (result.rowCount === 0) {
@@ -1058,12 +1115,8 @@ const ImportExcel = async (req, res) => {
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
 
         const requiredColumns = [
-            'company_name', 'owner_name', 'phone', 'alternate_phone', 'emailid', 'alternate_emailid',
-            'aadharcard_number', 'pancard_number', 'created_date', 'user_status', 'req_status',
-            'user_status_id', 'req_status_id', 'type_of_constitution', 'business_background', 
-            'msme_type', 'msme_number', 'type_of_service', 'currency_code', 'address', 'state', 
-            'region', 'city', 'country', 'zip_code', 'has_gstin', 'aggregate_turnover_exceeded', 
-            'state_name', 'state_code_number', 'gstin', 'head_office', 'state_id', 'country_id', 'city_id'
+            'company_name', 'owner_name', 'phone', 'emailid',
+            'aadharcard_number', 'pancard_number'
         ];
 
         const validateRow = (row) => {
@@ -1092,9 +1145,8 @@ const ImportExcel = async (req, res) => {
             row.emailid = row.emailid ? row.emailid.toLowerCase() : null;
 
             const {
-                company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
-                aadharcard_number, pancard_number, created_date, type_of_constitution, business_background, msme_type, msme_number, type_of_service, currency_code, address, state, region, city, country, zip_code, has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
-                head_office, state_id, country_id, city_id
+                company_name, owner_name, phone, emailid,
+                aadharcard_number, pancard_number, msme_number, address, zip_code, gstin, head_office
             } = row;
 
             const existingEntry = await pool.query(
@@ -1109,13 +1161,13 @@ const ImportExcel = async (req, res) => {
 
             const operatorResult = await pool.query(
                 `INSERT INTO operators_tbl (
-                    company_name, owner_name, phone, alternate_phone, emailid, alternate_emailid,
+                    company_name, owner_name, phone, emailid,
                     aadharcard_number, pancard_number, created_date, user_status, req_status,
                     user_status_id, req_status_id, type_name, type_id, password
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                ) VALUES ($1, $2, $3, $4, $5, $6, now(), $7, $8, $9, $10, $11, $12, $13)
                 RETURNING tbs_operator_id`,
-                [company_name, owner_name, row.phone, alternate_phone, row.emailid, alternate_emailid,
-                aadharcard_number, pancard_number, created_date, 'Draft', 'Draft',
+                [company_name, owner_name, row.phone, row.emailid,
+                aadharcard_number, pancard_number, 'Draft', 'Draft',
                 0, 0, 'OPERATOR', 'OP101', ''] 
             );
 
@@ -1133,33 +1185,13 @@ const ImportExcel = async (req, res) => {
             await pool.query(
                 `UPDATE operator_details
                 SET
-                    type_of_constitution = $2,
-                    business_background = $3,
-                    msme_type = $4,
-                    msme_number = $5,
-                    type_of_service = $6,
-                    currency_code = $7,
-                    address = $8,
-                    state = $9,
-                    region = $10,
-                    city = $11,
-                    country = $12,
-                    zip_code = $13,
-                    has_gstin = $14,
-                    aggregate_turnover_exceeded = $15,
-                    state_name = $16,
-                    state_code_number = $17,
-                    gstin = $18,
-                    head_office = $19,
-                    state_id = $20,
-                    country_id = $21,
-                    city_id = $22
-                WHERE tbs_operator_id = $1;
-                `,
-                [tbs_operator_id, type_of_constitution, business_background, msme_type, msme_number,
-                type_of_service, currency_code, address, state, region, city, country, zip_code,
-                has_gstin, aggregate_turnover_exceeded, state_name, state_code_number, gstin,
-                head_office, state_id, country_id, city_id]
+                    msme_number = $2,
+                    address = $3,
+                    zip_code = $4,
+                    gstin = $5,
+                    head_office = $6
+                WHERE tbs_operator_id = $1; `,
+                [tbs_operator_id, msme_number, address, zip_code, gstin, head_office]
             );
         }
 

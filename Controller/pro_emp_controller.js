@@ -1071,15 +1071,15 @@ const employeeLoginpro = async (req, res) => {
         const role_id = professionalResult.rows[0].role_type_id;
 
         const permissionsResult = await pool.query(
-            `SELECT crud_permissions, module_permissions 
+            `SELECT crud_permissions, module_permissions, active_module_permissions 
              FROM active_crud_permissions_tbl 
              WHERE tbs_user_id = $1 AND role_id = $2`,
             [employee.owner_id, role_id]
         );
 
-        const permissions = permissionsResult.rows[0];
+        const permissions = permissionsResult.rows.length > 0 ? permissionsResult.rows[0] : null;
 
-        const token = jwt.sign({ employeeId: employee.tbs_op_emp_id }, process.env.JWT_SECRET_KEY, {
+        const token = jwt.sign({ employeeId: employee.tbs_pro_emp_id }, process.env.JWT_SECRET_KEY, {
             expiresIn: '1w'
         });
 
@@ -1091,7 +1091,8 @@ const employeeLoginpro = async (req, res) => {
             type_id: employee.type_id,
             token,
             crud_permissions: permissions ? permissions.crud_permissions : null,
-            module_permissions: permissions ? permissions.module_permissions : null
+            module_permissions: permissions ? permissions.module_permissions : null,
+            active_module_permissions: permissions ? permissions.active_module_permissions : null
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1143,7 +1144,6 @@ const insertDatapro = async (req, res) => {
         const sheet_name_list = workbook.SheetNames;
         const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheet_name_list[0]]);
 
-        // Function to convert Excel serial date to JS date format
         const excelSerialToDate = (serial) => {
             const excelEpoch = moment('1899-12-30');
             return excelEpoch.add(serial, 'days').format('YYYY-MM-DD');
@@ -1155,7 +1155,7 @@ const insertDatapro = async (req, res) => {
             await client.query('BEGIN');
 
             for (const row of data) {
-                const requiredFields = ['emp_first_name', 'emp_last_name', 'phone', 'email_id', 'date_of_birth', 'gender'];
+                const requiredFields = ['emp_first_name', 'emp_last_name', 'phone', 'email_id'];
                 const hasRequiredFields = requiredFields.every(field => row[field]);
 
                 if (!hasRequiredFields) {
@@ -1169,6 +1169,18 @@ const insertDatapro = async (req, res) => {
                     row.joining_date = excelSerialToDate(row.joining_date);
                 }
 
+                row.email_id = row.email_id.toLowerCase();
+
+                const existingResult = await client.query(
+                    `SELECT 1 FROM pro_emp_personal_details WHERE phone = $1 OR email_id = $2`,
+                    [row.phone, row.email_id]
+                );
+
+                if (existingResult.rows.length > 0) {
+                    row.phone = null;
+                    row.email_id = null;
+                }
+
                 row.type_name = 'EMPLOYEE';
                 row.type_id = 'PROEMP101';
                 row.emp_status = 'Draft';
@@ -1176,19 +1188,16 @@ const insertDatapro = async (req, res) => {
 
                 const personalResult = await client.query(
                     `INSERT INTO pro_emp_personal_details (
-                        emp_first_name, emp_last_name, phone, email_id, alternate_phone, date_of_birth, gender, 
-                        blood_group, temp_add, temp_country, temp_state, temp_city, temp_zip_code, 
-                        perm_add, perm_country, perm_state, perm_city, perm_zip_code, type_name, 
-                        type_id, password, emp_status, emp_status_id, temp_region, perm_region, profile_img
+                        emp_first_name, emp_last_name, phone, email_id, alternate_phone, temp_add, temp_zip_code, perm_add, perm_zip_code, type_name, 
+                        type_id, password, emp_status, emp_status_id
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 
-                        $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+                        $14
                     ) RETURNING tbs_pro_emp_id`,
                     [
-                        row.emp_first_name, row.emp_last_name, row.phone, row.email_id, row.alternate_phone, row.date_of_birth, row.gender,
-                        row.blood_group, row.temp_add, row.temp_country, row.temp_state, row.temp_city, row.temp_zip_code,
-                        row.perm_add, row.perm_country, row.perm_state, row.perm_city, row.perm_zip_code, row.type_name,
-                        row.type_id, ' ', row.emp_status, row.emp_status_id, row.temp_region, row.perm_region, row.profile_img
+                        row.emp_first_name, row.emp_last_name, row.phone, row.email_id, row.alternate_phone, row.temp_add, row.temp_zip_code,
+                        row.perm_add, row.perm_zip_code, row.type_name,
+                        row.type_id, ' ', row.emp_status, row.emp_status_id
                     ]
                 );
 
@@ -1210,36 +1219,32 @@ const insertDatapro = async (req, res) => {
                 if (checkResult.rows.length === 0) {
                     await client.query(
                         `INSERT INTO pro_emp_professional_details (
-                            tbs_pro_emp_id, joining_date, designation, branch, language, qualification, 
-                            department, reporting_manager, aadhar_card_number, pan_card_number, role_type
+                            tbs_pro_emp_id, designation, branch, language, qualification, 
+                            department, reporting_manager, aadhar_card_number, pan_card_number
                         ) VALUES (
                             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
                         )`,
                         [
-                            employeeId, row.joining_date, row.designation, row.branch, row.language,
-                            row.qualification, row.department, row.reporting_manager, row.aadhar_card_number,
-                            row.pan_card_number, row.role_type
+                            employeeId, row.designation, row.branch, row.language,
+                            row.qualification, row.department, row.reporting_manager, row.aadhar_card_number, row.pan_card_number
                         ]
                     );
                 } else {
-                    // Update existing professional details
                     await client.query(
                         `UPDATE pro_emp_professional_details 
                         SET
-                            joining_date = COALESCE($2, joining_date),
-                            designation = COALESCE($3, designation),
-                            branch = COALESCE($4, branch),
-                            language = COALESCE($5, language),
-                            qualification = COALESCE($6, qualification),
-                            department = COALESCE($7, department),
-                            reporting_manager = COALESCE($8, reporting_manager),
-                            aadhar_card_number = COALESCE($9, aadhar_card_number),
-                            pan_card_number = COALESCE($10, pan_card_number),
-                            role_type = COALESCE($11, role_type)
+                            designation = COALESCE($2, designation),
+                            branch = COALESCE($3, branch),
+                            language = COALESCE($4, language),
+                            qualification = COALESCE($5, qualification),
+                            department = COALESCE($6, department),
+                            reporting_manager = COALESCE($7, reporting_manager),
+                            aadhar_card_number = COALESCE($8, aadhar_card_number),
+                            pan_card_number = COALESCE($9, pan_card_number)
                         WHERE tbs_pro_emp_id = $1;`,
                         [
-                            employeeId, row.joining_date, row.designation, row.branch, row.language,
-                            row.qualification, row.department, row.reporting_manager, row.aadhar_card_number, row.pan_card_number, row.role_type
+                            employeeId, row.designation, row.branch, row.language,
+                            row.qualification, row.department, row.reporting_manager, row.aadhar_card_number, row.pan_card_number
                         ]
                     );
                 }
@@ -1280,12 +1285,70 @@ const insertDatapro = async (req, res) => {
                     tbs_pro_emp_id = $3 
             RETURNING *`,
             [emp_status, emp_status_id, id]
-        )
-        if (result.rows.length === 0) {
-          return res.status(200).json({ message: 'Record not found' });
-      }
+        );
 
-      res.status(200).json({message: 'Employee Status is Updated Successfully'});
+        const email_id = result.rows[0].email_id
+        const password = result.rows[0].password
+
+        if (result.rows.length === 0) {
+            return res.status(200).json({ message: 'Record not found' });
+        }
+
+        // Send email notification
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.office365.com',
+            port: 587,
+            secure: false,
+            auth: {
+                user: 'no-reply@thebusstand.com',
+                pass: 'bdqbqlgqgcnnrxrr',
+            },
+            debug: false, 
+            logger: false, 
+        });        
+
+        const mailOptions = {
+            from: 'no-reply@thebusstand.com',
+            to: email_id,
+            subject: 'Status Update Notification - TheBusStand',
+            html: `
+            <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 15px;">
+                <div style="background-color: #1F487C; padding: 10px; border-radius: 10px 10px 0 0; text-align: center; color: #fff;">
+                    <a href="http://192.168.90.43:8082/poemployee" style="color: #FFFFFF; font-size: 22px; font-weight: 600; margin: 0; text-decoration: none;">
+                        THEBUSSTAND.COM
+                    </a>
+                </div>
+                <div style="padding: 20px; background-color: #ffffff; text-align: center; border: 3px solid #1F487C; border-radius: 0 0 10px 10px;">
+                    <h2 style="color: #1F487C; font-size: 22px; margin-bottom: 8px;">Welcome to TheBusStand.com!</h2>
+                    <p style="font-size: 16px; color: #1F487C; margin-bottom: 15px;">
+                        We're excited to have you on board. Your account is now <strong>${emp_status}</strong>.
+                    </p>
+                    <p style="font-size: 14px; color: #555; margin-bottom: 15px;">
+                        Below are your account details:
+                    </p>
+                    <div style="text-align: left; font-size: 16px; color: #1F487C; background-color: #F4F6F8; padding: 15px; margin: 10px auto; border-radius: 8px; border: 1px solid #D2DAE5;">
+                        <p><strong>Email ID:</strong> ${email_id}</p>
+                        <p><strong>Password:</strong> ${password}</p>
+                        <p><strong>Login URL:</strong> <a href="http://192.168.90.43:8082/poemployee" style="color: #1F487C; text-decoration: none;">Click here to login</a></p>
+                    </div>
+                    <p style="font-size: 12px; color: #777; margin-top: 15px;">
+                        If you have any questions, feel free to reach out to our support team.
+                    </p>
+                </div>
+                <div style="padding: 10px; background-color: #D2DAE5; text-align: center; border-radius: 0 0 10px 10px;">
+                    <p style="font-size: 12px; color: #999; margin: 0;">
+                        This email was sent by TheBusStand no-reply.
+                    </p>
+                    <p style="font-size: 12px; color: #999; margin: 5px 0 0 0;">
+                        © 2024 TheBusStand. All rights reserved.
+                    </p>
+                </div>
+            </div>`
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        res.status(200).json({ message: 'Employee Status is Updated Successfully and Email Notification Sent' });
     } catch (err) {
         console.error('Error updating employee status:', err.message);
         res.status(500).json({ error: 'Internal server error' });

@@ -62,8 +62,9 @@ const createPartner = async (req, res) => {
     alternate_phone,
     date_of_birth,
     gender,
-    occupation, occupation_id
-  } = req.body
+    occupation, occupation_id,
+    tbs_user_id
+  } = req.body;
 
   if (!partner_first_name ||
     !partner_last_name ||
@@ -71,20 +72,47 @@ const createPartner = async (req, res) => {
     !emailid ||
     !alternate_phone ||
     !date_of_birth ||
-    !gender || !occupation || !occupation_id) {
-    return res.status(400).json({ error: 'Missing required fields' })
+    !gender || !occupation || !occupation_id || !tbs_user_id) {
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
-    const type_name = 'PARTNER'
-    const type_id = 'PART101'
-    const partnerStatus = 'Draft';
-    const partnerStatusId = 0;
-    const reqStatus = null;
-    const reqStatusId = null;
+  const type_name = 'PARTNER';
+  const type_id = 'PART101';
+  const partnerStatus = 'Draft';
+  const partnerStatusId = 0;
+  const reqStatus = null;
+  const reqStatusId = null;
 
-    const profile_img = req.file ? `/partner_files/${req.file.filename}` : null;
+  const profile_img = req.file ? `/partner_files/${req.file.filename}` : null;
 
   try {
+    if (tbs_user_id.startsWith('tbs-pro_emp')) {
+      const empResult = await pool.query(
+        `SELECT emp_status_id FROM pro_emp_personal_details WHERE tbs_pro_emp_id = $1`,
+        [tbs_user_id]
+      );
+
+      if (empResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Employee ID does not exist.' });
+      }
+
+      const empStatusId = empResult.rows[0].emp_status_id;
+      if (empStatusId !== 1) {
+        return res.status(400).json({ error: 'Employee ID is not active.' });
+      }
+    } else if (tbs_user_id.startsWith('tbs-pro')) {
+      const proResult = await pool.query(
+        `SELECT 1 FROM product_owner_tbl WHERE owner_id = $1`,
+        [tbs_user_id]
+      );
+
+      if (proResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Product owner ID does not exist.' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Invalid tbs_user_id format.' });
+    }
+
     const result = await pool.query(
       `INSERT INTO partner_details (
           partner_first_name, 
@@ -100,9 +128,9 @@ const createPartner = async (req, res) => {
           partner_status_id, 
           req_status,       
           req_status_id,
-          profile_img, occupation, occupation_id     
+          profile_img, occupation, occupation_id, tbs_user_id     
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) 
         RETURNING tbs_partner_id`,
       [
         partner_first_name,
@@ -114,17 +142,17 @@ const createPartner = async (req, res) => {
         gender,
         type_name,
         type_id,
-        partnerStatus, partnerStatusId, reqStatus, reqStatusId, profile_img, occupation, occupation_id
+        partnerStatus, partnerStatusId, reqStatus, reqStatusId, profile_img, occupation, occupation_id, tbs_user_id
       ]
-    )
+    );
 
-    const tbs_partner_id = result.rows[0].tbs_partner_id
+    const tbs_partner_id = result.rows[0].tbs_partner_id;
 
-    const password = `PAT@${tbs_partner_id}`
+    const password = `PAT@${tbs_partner_id}`;
     await pool.query(
       `UPDATE partner_details SET password = $1 WHERE tbs_partner_id = $2`,
       [password, tbs_partner_id]
-    )
+    );
 
     res.status(201).json({
       message: 'Partner Created Successfully',
@@ -132,10 +160,10 @@ const createPartner = async (req, res) => {
       password: password,
       type_name: type_name,
       type_id: type_id
-    })
+    });
   } catch (err) {
-    console.error('Error inserting into database:', err)
-    res.status(200).json({ error: 'Database insertion failed' })
+    console.error('Error inserting into database:', err);
+    res.status(500).json({ error: 'Database insertion failed' });
   }
 }
 
@@ -743,10 +771,7 @@ const importPartnerDetails = async (req, res) => {
     for (const row of flaggedData) {
       const {
         partner_first_name, partner_last_name, phone, emailid,
-        alternate_phone, date_of_birth, gender,
-        temp_add, temp_country, temp_state, temp_city, temp_region, temp_zip_code,
-        perm_add, perm_country, perm_state, perm_city, perm_region, perm_zip_code,
-        occupation, occupation_id
+        alternate_phone, temp_add, temp_zip_code, perm_add, perm_zip_code
       } = row;
 
       const type_name = 'PARTNER';
@@ -756,29 +781,26 @@ const importPartnerDetails = async (req, res) => {
       const req_status = 'Draft';
       const req_status_id = 0;
 
-      if (!partner_first_name || !partner_last_name || !date_of_birth || !gender) {
+      if (!partner_first_name || !partner_last_name ) {
         return res.status(400).json({ error: 'Missing required fields in Excel data' });
       }
 
-      const formattedDOB = moment(date_of_birth, ['MM-DD-YYYY', 'DD-MM-YYYY', 'YYYY-MM-DD']).format('YYYY-MM-DD');
-      if (!formattedDOB || formattedDOB === 'Invalid date') {
-        return res.status(400).json({ error: 'Invalid date format in Excel data' });
-      }
+      // const formattedDOB = moment(date_of_birth, ['MM-DD-YYYY', 'DD-MM-YYYY', 'YYYY-MM-DD']).format('YYYY-MM-DD');
+      // if (!formattedDOB || formattedDOB === 'Invalid date') {
+      //   return res.status(400).json({ error: 'Invalid date format in Excel data' });
+      // }
 
       const result = await pool.query(
         `INSERT INTO partner_details (
           partner_first_name, partner_last_name, phone, emailid, alternate_phone,
-          date_of_birth, gender, type_name, type_id, partner_status,
-          partner_status_id, req_status, req_status_id, temp_add, temp_country,
-          temp_state, temp_city, temp_region, temp_zip_code, perm_add, perm_country,
-          perm_state, perm_city, perm_region, perm_zip_code, occupation, occupation_id
+          type_name, type_id, partner_status,
+          partner_status_id, req_status, req_status_id, temp_add, temp_zip_code, perm_add, perm_zip_code
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         RETURNING tbs_partner_id;`,
         [
-          partner_first_name, partner_last_name, phone, emailid, alternate_phone,
-          formattedDOB, gender, type_name, type_id, partner_status, partner_status_id,
-          req_status, req_status_id, temp_add, temp_country, temp_state, temp_city, temp_region, temp_zip_code, perm_add, perm_country, perm_state, perm_city, perm_region, perm_zip_code, occupation, occupation_id
+          partner_first_name, partner_last_name, phone, emailid, alternate_phone, type_name, type_id, partner_status, partner_status_id,
+          req_status, req_status_id, temp_add, temp_zip_code, perm_add, perm_zip_code
         ]
       );
 

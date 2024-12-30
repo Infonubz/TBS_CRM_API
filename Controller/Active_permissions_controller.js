@@ -22,7 +22,7 @@ const getCrudpermissionsbyPro = async (req, res) => {
 //POST CRUD PERMISSIONS
 const postCrudPermissions = async (req, res) => {
     const { crud_permission_id } = req.params;
-    const { crud_permissions, module_permissions } = req.body;
+    const { crud_permissions, module_permissions, active_permissions, active_module_permissions } = req.body;
 
     if (!Number.isInteger(Number(crud_permission_id))) {
         return res.status(400).json({ error: 'crud_permission_id must be an integer' });
@@ -41,12 +41,23 @@ const postCrudPermissions = async (req, res) => {
         return res.status(400).json({ error: 'Invalid module_permissions format' });
     }
 
+    let parsedActiveModulePermissions;
+    try {
+        parsedActiveModulePermissions = active_module_permissions
+            ? JSON.stringify(active_module_permissions)
+            : null;
+    } catch (err) {
+        return res.status(400).json({ error: 'Invalid module_permissions format' });
+    }
+
     const updateCrudPermissionsQuery = `
         UPDATE public.active_crud_permissions_tbl
         SET crud_permissions = COALESCE($1::text[], crud_permissions), 
             module_permissions = COALESCE($2::JSONB, module_permissions),
+            active_module_permissions = COALESCE($3::JSONB, active_module_permissions),
+            active_permissions = COALESCE($4::BOOLEAN, active_permissions),
             updated_date = NOW()
-        WHERE crud_permission_id = $3
+        WHERE crud_permission_id = $5
         RETURNING role_id, crud_permissions;
     `;
 
@@ -54,6 +65,8 @@ const postCrudPermissions = async (req, res) => {
         const result = await pool.query(updateCrudPermissionsQuery, [
             crud_permissions,
             parsedModulePermissions,
+            parsedActiveModulePermissions,
+            active_permissions,
             crud_permission_id,
         ]);
 
@@ -562,7 +575,7 @@ const searchPermissions = async (req, res) => {
                 SELECT *
                 FROM active_permissions_tbl
                 WHERE tbs_user_id = $1 AND LOWER(role_type) LIKE $2
-                   OR (TO_CHAR(created_date, 'Mon') || ' ' || TO_CHAR(created_date, 'DD')) ILIKE $2 `;
+                   OR (TO_CHAR(created_date, 'DD') || ' ' || TO_CHAR(created_date, 'Mon')) ILIKE $2 `;
 
             queryParams = [tbs_user_id, searchValue];
         } else {
