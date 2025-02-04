@@ -23,7 +23,7 @@ const BulkMail = async (req, res) => {
         const insertQuery = `
             INSERT INTO public.bulk_mail (user_name, tbs_user_id, to_email, subject)
             VALUES ($1, $2, $3, $4)
-            RETURNING * `
+            RETURNING *   `
         const values = [user_name, tbs_user_id, toEmailString, subject]
         await pool.query(insertQuery, values)
 
