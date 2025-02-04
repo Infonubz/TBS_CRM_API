@@ -1021,20 +1021,6 @@ const operatorLogin = async (req, res) => {
         const typeName = operator.type_name;
         const typeId = operator.type_id;
 
-        const workbook = XLSX.utils.book_new();
-        const worksheetData = [
-            ['Email ID', 'Phone Number'],
-            [operator.emailid, operator.phone],
-        ];
-        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Operator Details');
-
-        const safeOwnerName = String(ownerName).replace(/[^a-zA-Z0-9]/g, '_');
-        const fileName = `${safeOwnerName}_Login_details.xlsx`;
-
-        const filePath = path.join(__dirname, '..', 'operatorslogin_excels', fileName);
-        XLSX.writeFile(workbook, filePath);
-
         const token = jwt.sign({ operatorId }, process.env.JWT_SECRET_KEY, { expiresIn: '1w' });
 
         res.json({
@@ -1043,8 +1029,7 @@ const operatorLogin = async (req, res) => {
             owner_name: ownerName,
             type_name: typeName,
             type_id: typeId,
-            token: token,
-            excelFilePath: filePath,
+            token: token
         });
 
     } catch (error) {
