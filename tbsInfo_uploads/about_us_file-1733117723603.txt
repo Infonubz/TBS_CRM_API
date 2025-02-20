@@ -1,0 +1,86 @@
+
+List the key responsibilities of your role (use as many boxes as necessary)​
+
+1​
+
+Design and implement a visually appealing and responsive user interface using HTML, Tailwind CSS, JavaScript, and React.js​
+
+2​
+
+Debugging and troubleshooting issues related to UI rendering, component behaviour, and API interaction​
+
+3​
+
+Integrate APIs to facilitate seamless data exchange with backend systems in collaboration with backend developers​
+
+4​
+
+Develop reusable React components to streamline the application structure and improve maintainability​
+
+5​
+
+Optimize performance through techniques such as code minification, image optimization, and lazy loading, resulting in improved loading times​
+
+6​
+
+Manage asynchronous operations with async/await and error handling using try-catch methods to enhance reliability​
+
+7​
+
+Translate design elements into functional web pages and integrate third-party libraries to enrich user interaction​
+
+8​
+
+Utilize state management libraries like Redux and React hooks to handle state and side effects effectively​
+
+9​
+
+Practicing unit tests for React components to ensure code quality and maintainability​
+
+10​
+
+Identify and recommend process improvements to optimize workflows and enhance team efficiency​
+
+
+
+
+
+
+
+
+
+
+
+
+What steps can you or/and the company take to improve your own effectiveness to ensure you meet your duties and responsibilities fully?​
+
+1​
+
+Conduct regular code reviews :​
+
+Implement frequent code review sessions to ensure continuous improvement and uphold coding standards​
+
+2​
+
+Provide opportunities for continuous learning :​
+
+Enroll in relevant training programs or workshops focused on advanced frontend development to stay updated with industry trends​
+
+3​
+
+Enhance collaboration :​
+Work closely with designers and backend developers to achieve project goals, fostering a team-oriented environment that contributes positively to project success​
+
+4​
+
+Develop communication skills :​
+
+Focus on clear and effective communication with team members to ensure mutual understanding and collaboration​
+
+5​
+
+Schedule regular feedback sessions :​
+Conduct one-on-one meetings to assess progress, gather feedback, and identify areas for improvement​
+
+
+

@@ -1,0 +1,2 @@
+clientgridview.js
+partner full module
