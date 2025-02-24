@@ -3,7 +3,7 @@ name: CI/CD Pipeline for EC2
 on:
   push:
     branches:
-      - master
+      - development
 
 jobs:
   build:
@@ -23,10 +23,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest .
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/tbs_crm_api:latest .
 
       - name: Push Docker image to Docker Hub
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/tbs_crm_api:latest
 
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.5.3
@@ -36,8 +36,8 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}   << 'EOF'
-            docker pull ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
-            docker stop dummy-api-crm || true
-            docker rm dummy-api-crm|| true
-            docker run -d -p 4001:4000 --name dummy-api-crm ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/tbs_crm_api:latest
+            docker stop tbs_crm_api || true
+            docker rm tbs_crm_api || true
+            docker run -d -p 4001:4000 --name tbs_crm_api ${{ secrets.DOCKER_USERNAME }}/tbs_crm_api:latest
           EOF
