@@ -1,0 +1,43 @@
+name: CI/CD Pipeline for EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest .
+
+      - name: Push Docker image to Docker Hub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.EC2_PRIVATE_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}   << 'EOF'
+            docker pull ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
+            docker stop dummy-api-crm || true
+            docker rm dummy-api-crm|| true
+            docker run -d -p 4001:4000 --name dummy-api-crm ${{ secrets.DOCKER_USERNAME }}/dummy-api-crm:latest
+          EOF
